@@ -1,0 +1,5 @@
+ebin
+.rebar3
+src/*.beam
+_build
+rebar.lock

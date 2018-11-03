@@ -1,0 +1,12 @@
+%% -*- erlang -*-
+{application, cluster_booter,
+ [
+  {description, "Cluster Booter"},
+  {vsn, "0.1"},
+  {id, "cluster_booter"},
+  {modules,      []},
+  {registered,   []},
+  {applications, [kernel, stdlib, sasl, ast_traverse, getopt, providers, erlando]},
+  {env,  [{nodes, []}]}
+ ]
+}.
