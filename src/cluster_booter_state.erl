@@ -14,7 +14,10 @@
 -export([load_terms/2]).
 -export([initialize/1]).
 -export([add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
--export([add_provider/2]).
+-export([add_provider/2, add_to_provider_hooks/3]).
+-export([cmd_opt/2]).
+-export([fold_host_nodes/3, installed/3]).
+-export([node_started/2]).
 
 -include_lib("providers/include/providers.hrl").
 
@@ -23,11 +26,13 @@
 -record(state_t, {providers = [], 
                   init_providers = [],
                   added_providers = [],
+                  provider_hooks = [],
                   current_host = "localhost",
                   packages_path = ".",
                   packages = maps:new(),
                   installed_packages = maps:new(),
                   root,
+                  env = [],
                   node_name,
                   cookie,
                   nodes = [], 
@@ -59,6 +64,9 @@ new() ->
 validate(_State) ->
     ok.
 
+cmd_opt(Host, #state_t{current_host = CurrentHost}) ->
+    [{host, Host}, {current_host, CurrentHost}].
+
 initialize(State) ->
     InitProviders = init_providers(State),
     AddedProviders = added_providers(State),
@@ -73,12 +81,18 @@ initialize(State) ->
                  cluster_booter_prv_packages,
                  cluster_booter_prv_installed_packages,
                  cluster_booter_prv_install_packages,
-                 cluster_booter_prv_start_node
+                 cluster_booter_prv_start_node,
+                 cluster_booter_prv_initialize
                 ];
             _ ->
                 InitProviders
         end,
-    create_all_providers(State, Providers ++ AddedProviders).
+    case create_all_providers(State, Providers ++ AddedProviders) of
+        {ok, NState} ->
+            init_provider_hooks(NState);
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 load_terms(Configs, State) ->    
     lists:foldl(
@@ -115,7 +129,7 @@ load_term({hosts, Hosts}, State) when is_list(Hosts) ->
           fun({Host, Nodes}, Acc) ->
                   lists:foldl(
                     fun(NodeName, Acc1) ->
-                            [{NodeName, binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8)}|Acc1]
+                            [{NodeName, cluster_booter_node:node(NodeName, Host)}|Acc1]
                     end, Acc, Nodes)
           end, [], Hosts),
     NHosts = maps:from_list(Hosts),
@@ -153,6 +167,12 @@ load_term({current_host, CurrentHost}, State) ->
 load_term({packages_path, PackagePath}, State) ->
     NState = packages_path(State, PackagePath),
     {ok, NState};
+load_term({hooks, Hooks}, State) ->
+    NState = provider_hooks(State, Hooks),
+    {ok,NState};
+load_term({env, Env}, State) ->
+    NState = env(State, Env),
+    {ok, NState};
 load_term(_Term, State) ->
     {ok, State}.
 
@@ -172,6 +192,22 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
             State#state_t{providers=[Provider | Providers]}
     end.
 
+add_to_provider_hooks(HookName, {HookType, ProviderName}, #state_t{provider_hooks = ProviderHooks} = State) ->
+    State#state_t{provider_hooks = ProviderHooks ++ [{HookType, ProviderName, HookName}]}.
+
+init_provider_hooks(#state_t{providers = Providers, provider_hooks = Hooks} = State) ->
+    case lists:foldl(
+           fun({PrePost, Name, Hook}, {ok, ProvidersAcc}) ->
+                   cluster_booter_providers:add_hook(PrePost, Name, Hook, ProvidersAcc);
+              (_, {error, Reason}) ->
+                   {error, Reason}
+           end, {ok, Providers}, Hooks) of
+        {ok, NProviders} ->
+            {ok, State#state_t{providers = NProviders}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 add_started_node(#state_t{started_nodes = Nodes} = State, Node) ->
     State#state_t{started_nodes = [Node|Nodes]}.
 
@@ -180,6 +216,36 @@ add_unstarted_node(#state_t{unstarted_nodes = Nodes} = State, Node) ->
 
 add_undefined_node(#state_t{undefined_nodes = Nodes} = State, Node) ->
     State#state_t{undefined_nodes = [Node|Nodes]}.
+
+fold_host_nodes(Fun, Init, #state_t{hosts = Hosts, node_release_map = NodeReleases}) ->
+    maps:fold(
+      fun(Host, Nodes, Acc) ->
+              lists:foldl(
+                fun(Node, Acc1) ->
+                        case maps:find(Node, NodeReleases) of
+                            {ok, Release} ->
+                                Fun(Host, Release, Node, Acc1);
+                            error ->
+                                Acc1
+                        end
+                end, Acc, Nodes)
+      end, Init, Hosts).
+
+installed(Host, Release, #state_t{installed_packages = InstalledPackages}) ->
+   case maps:find(Host, InstalledPackages) of
+       {ok, HostInstalled} ->
+           case maps:find(Release, HostInstalled) of
+               {ok, Installed} ->
+                   Installed;
+               error ->
+                   unknown
+           end;
+       error ->
+           unknown
+   end.
+
+node_started(NodeName, #state_t{started_nodes = StartedNodes}) ->
+    lists:member(NodeName, StartedNodes).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

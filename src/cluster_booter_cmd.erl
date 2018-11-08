@@ -63,9 +63,8 @@ cmd(start_boot, Args) ->
     NodeName = proplists:get_value(node_name, Args),
     ReleaseName = proplists:get_value(release_name, Args),
     BaseDir = proplists:get_value(base_dir, Args),
-    BootFile = proplists:get_value(boot_file, Args),
     Start = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
-    Start ++ " start_boot " ++ BootFile;
+    Start ++ " start_boot load";
 cmd(extract, Args) ->
     Release = proplists:get_value(release, Args),
     Version = proplists:get_value(version, Args),

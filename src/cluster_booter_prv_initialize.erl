@@ -4,41 +4,34 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  2 Nov 2018 by Chen Slepher <slepheric@gmail.com>
+%%% Created :  7 Nov 2018 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
--module(cluster_booter_prv_application).
-
--export([init/1, do/1, format_error/1]).
+-module(cluster_booter_prv_initialize).
 
 %% API
--define(PROVIDER, start_apps).
--define(DEPS, [app_status]).
+-export([init/1,
+         do/1,
+         format_error/1]).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
+-define(PROVIDER, initialize).
+-define(DEPS, [install, start_nodes, mnesia, start_apps]).
+
 -spec init(cluster_booter_state:t()) -> {ok, cluster_booter_state:t()}.
 init(State) ->
     Provider = providers:create([{name, ?PROVIDER},
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
-                                 {desc, "start erlang applications on already started nodes."}
+                                 {desc, "initialize nodes and start all applications."}
                                 ]),
-    State1 = cluster_booter_state:add_provider(State, Provider),
-    {ok, State1}.
+    NState = cluster_booter_state:add_provider(State, Provider),
+    {ok, NState}.
 
 do(State) ->
-    MainApplicationSt = cluster_booter_state:main_application_st(State),
-    NodeMap = cluster_booter_state:node_map(State),
-    case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
-        {ok, ok} ->
-            {ok, State};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    {ok, State}.
 
-format_error({application_not_started, Result}) ->
-    io_lib:format("application start failed ~p", [Result]).
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
+
 
 %%%===================================================================
 %%% API
@@ -53,3 +46,5 @@ format_error({application_not_started, Result}) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+                        

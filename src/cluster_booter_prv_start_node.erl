@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, start_node).
--define(DEPS, [install_status, node_status]).
+-define(DEPS, [installed, node_status]).
 
 %%%===================================================================
 %%% API
@@ -28,6 +28,29 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
+    dbg:tracer(),
+    dbg:tpl(cluster_booter_state, node_started, cx),
+    dbg:p(all, [c]),
+    BaseDir = cluster_booter_state:root(State),
+    cluster_booter_state:fold_host_nodes(
+      fun(Host, Release, NodeName, ok) ->
+              case cluster_booter_state:installed(Host, Release, State) of
+                  true ->
+                      case cluster_booter_state:node_started(NodeName, State) of
+                          false ->
+                              CmdOpt = cluster_booter_state:cmd_opt(Host, State),
+                              CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, BaseDir}],
+                              Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
+                              io:format("cmd is ~p~n", [Cmd]),
+                              os:cmd(Cmd),
+                              io:format("start ~p at ~s~n", [Release, Host]);
+                          true ->
+                              io:format("node ~p is already started at ~s~n", [Release, Host])
+                      end;
+                  false ->
+                      io:format("release ~p is not installed at ~s~n", [Release, Host])
+              end
+      end, ok, State),
     {ok, State}.
 
 format_error(_Error) ->

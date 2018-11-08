@@ -48,7 +48,7 @@ do(State) ->
                         end, maps:new(), Nodes),
                   maps:put(Host, HostSt, Acc)
           end, maps:new(),Hosts),
-    format_installed_packages(InstalledPackages),
+    cluster_booter_packages:format_installed(InstalledPackages),
     NState = cluster_booter_state:installed_packages(State, InstalledPackages),
     {ok, NState}.
     
@@ -68,19 +68,3 @@ format_error(Reason) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-format_installed_packages(Packages) ->
-    maps:fold(
-      fun(Host, NodeMap, ok) ->
-              maps:fold(
-                fun(Node, Status, ok) ->
-                        StatusStr = 
-                            case Status of
-                                true ->
-                                    "installed";
-                                false ->
-                                    "not_installed"
-                            end,
-                        io:format("~p is ~s at host ~s~n", [Node, StatusStr, Host])
-                end, ok, NodeMap)
-      end, ok, Packages).

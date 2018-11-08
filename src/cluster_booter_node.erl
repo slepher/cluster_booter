@@ -9,12 +9,17 @@
 -module(cluster_booter_node).
 
 %% API
+-export([node/2]).
 -export([validate_nodes_started/1]).
 -export([validate_nodes_exists/2, validate_nodes_started/2, validate_nodes_stopped/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+node(NodeName, Host) ->
+    binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8).
+
 
 validate_nodes_exists(Nodes, NodeMap) ->
     lists:foldl(

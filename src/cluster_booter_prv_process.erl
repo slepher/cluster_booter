@@ -29,7 +29,7 @@ init(State) ->
 
 do(State) ->
     HostMap = cluster_booter_state:hosts(State),
-    CurrentHost = cluster_booter_status:current_host(State),
+    CurrentHost = cluster_booter_state:current_host(State),
     Hosts = maps:keys(HostMap),
     RunningProcesses = 
         lists:foldl(
