@@ -20,18 +20,12 @@ main(Args) ->
     {ok, _} = application:ensure_all_started(erlando),
     case getopt:parse([], Args) of
         {ok, {Options, NonOptions}} ->
-            case lists:member(help, Options) or (NonOptions == []) of
-                true ->
-                    usage();
-                false ->
-                    [Command|_] = NonOptions,
-                    do(Options, [list_to_atom(Command)])
-            end;
+            do(Options, NonOptions);
         {error, Detail} ->
             format_error(Detail)
     end.
 
-do(Options, Actions) ->
+do(Options, NonOptions) ->
     State = cluster_booter_state:new(),
     ConfigFile = cluster_booter_config_base:config_file(Options, config, "booter.config"),
     Result = 
@@ -41,9 +35,15 @@ do(Options, Actions) ->
                cluster_booter_state:validate(NState),
                NNState <- cluster_booter_state:initialize(NState),
                set_node_name_and_cookie(NNState),
-               ok = io:format("cookie is ~p, node is ~p.~n", [erlang:get_cookie(), node()]),
                AllProviders = cluster_booter_state:providers(NNState),
-               cluster_booter_providers:run(Actions, AllProviders, NNState)
+               case lists:member(help, Options) or (NonOptions == []) of
+                   true ->
+                       usage(AllProviders);
+                   false ->
+                       [Command|_] = NonOptions,
+                       Actions = [list_to_atom(Command)],
+                       cluster_booter_providers:run(Actions, AllProviders, NNState)
+               end
            ]),
     handle_output(State, command_line, Result).
 
@@ -62,9 +62,19 @@ handle_output(_State, command_line, _) ->
 handle_output(_State, api, Result) ->
     Result.
 
-usage() ->
-    io:format("ok"),
-    ok.
+usage(AllProviders) ->
+    io:format("cluster_booter [command]:~n"),
+    lists:foreach(
+      fun(Provider) ->
+              Name = providers:impl(Provider),
+              Desc = case providers:desc(Provider) of
+                         undefined ->
+                             "";
+                         Val ->
+                             Val
+                     end,
+              io:format("~4s~-20s~s~n", ["", Name, Desc])
+      end, AllProviders).
 
 -spec format_error(Reason::term()) -> string().
 format_error({invalid_return_value, Provider, Value}) ->

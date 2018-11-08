@@ -4,15 +4,15 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  2 Nov 2018 by Chen Slepher <slepheric@gmail.com>
+%%% Created :  7 Nov 2018 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
--module(cluster_booter_prv_application).
+-module(cluster_booter_prv_start_node).
 
 -export([init/1, do/1, format_error/1]).
 
 %% API
--define(PROVIDER, start_apps).
--define(DEPS, [app_status]).
+-define(PROVIDER, start_node).
+-define(DEPS, [install_status, node_status]).
 
 %%%===================================================================
 %%% API
@@ -22,22 +22,16 @@ init(State) ->
     Provider = providers:create([{name, ?PROVIDER},
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
-                                 {desc, "start erlang applications on already started nodes."}
+                                 {desc, "start erlang nodes with or without application."}
                                 ]),
     State1 = cluster_booter_state:add_provider(State, Provider),
     {ok, State1}.
 
 do(State) ->
-    MainApplicationSt = cluster_booter_state:main_application_st(State),
-    case cluster_booter_application:boot_applications(MainApplicationSt, State) of
-        {ok, ok} ->
-            {ok, State};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    {ok, State}.
 
-format_error({application_not_started, Result}) ->
-    io_lib:format("application start failed ~p", [Result]).
+format_error(_Error) ->
+    ok.
 
 %%%===================================================================
 %%% API

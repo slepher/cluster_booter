@@ -21,9 +21,12 @@
 %%%===================================================================
 -spec init(cluster_booter_state:t()) -> {ok, cluster_booter_state:t()}.
 init(State) ->
-    State1 = cluster_booter_state:add_provider(State, providers:create([{name, ?PROVIDER},
-                                                                        {module, ?MODULE},
-                                                                        {deps, ?DEPS}])),
+    Provider = providers:create([{name, ?PROVIDER},
+                                 {module, ?MODULE},
+                                 {deps, ?DEPS},
+                                 {desc, "show erlang node status in same cluster."}
+                                ]),
+    State1 = cluster_booter_state:add_provider(State, Provider),
     {ok, State1}.
 
 do(State) ->

@@ -13,31 +13,30 @@
 -export([validate/1]).
 -export([load_terms/2]).
 -export([initialize/1]).
--export([node_name/1, node_name/2]).
--export([cookie/1, cookie/2]).
--export([nodes/1, nodes/2]).
--export([started_nodes/1, started_nodes/2, add_started_node/2]).
--export([unstarted_nodes/1, unstarted_nodes/2, add_unstarted_node/2]).
--export([undefined_nodes/1, undefined_nodes/2, add_undefined_node/2]).
--export([hosts/1, hosts/2]).
--export([mnesia_nodes/1, mnesia_nodes/2]).
--export([mnesia_schema/1, mnesia_schema/2]).
--export([releases/1, releases/2]).
--export([application_st/1, application_st/2]).
--export([main_application_st/1, main_application_st/2]).
--export([node_map/1, node_map/2, providers/1, providers/2, add_provider/2]).
+-export([add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
+-export([add_provider/2]).
 
 -include_lib("providers/include/providers.hrl").
+
+-compile({parse_transform, make_lenses}).
 
 -record(state_t, {providers = [], 
                   init_providers = [],
                   added_providers = [],
+                  current_host = "localhost",
+                  packages_path = ".",
+                  packages = maps:new(),
+                  installed_packages = maps:new(),
+                  root,
                   node_name,
                   cookie,
                   nodes = [], 
+                  release_nodes_map = maps:new(),
+                  node_release_map = maps:new(),
                   started_nodes = [],
                   unstarted_nodes = [],
                   undefined_nodes = [],
+                  running_processes = [],
                   node_map = maps:new(), 
                   hosts = maps:new(),
                   mnesia_nodes = maps:new(),
@@ -48,6 +47,8 @@
                   allow_provider_overrides=false}).
 
 -type t() :: #state_t{}.
+
+-make_lenses([state_t]).
 
 %%%===================================================================
 %%% API
@@ -67,7 +68,12 @@ initialize(State) ->
                 [cluster_booter_prv_node_status,
                  cluster_booter_prv_application_status,
                  cluster_booter_prv_mnesia,
-                 cluster_booter_prv_application
+                 cluster_booter_prv_application,
+                 cluster_booter_prv_process,
+                 cluster_booter_prv_packages,
+                 cluster_booter_prv_installed_packages,
+                 cluster_booter_prv_install_packages,
+                 cluster_booter_prv_start_node
                 ];
             _ ->
                 InitProviders
@@ -82,16 +88,40 @@ load_terms(Configs, State) ->
               {error, Reason}
       end, {ok, State}, Configs).
 
-load_term({nodes, Nodes}, State) ->
-    {ok, nodes(State, Nodes)};
-load_term({hosts, Hosts}, State) ->
+load_term({nodes, NodeList}, State) ->
+    {ReleaseNodesMap, NodeReleaseMap, NNodes} = 
+        lists:foldl(
+          fun({Release, Nodes}, {AccReleaseNodesMap, AccNodeReleaseMap, AccNodes}) ->
+                  NAccReleaseNodesMap = maps:put(Release, Nodes, AccReleaseNodesMap),
+                  NAccNodeReleaseMap = 
+                      lists:foldl(
+                        fun(Node, Acc) ->
+                                maps:put(Node, Release, Acc)
+                        end, AccNodeReleaseMap, Nodes),
+                  NAccNodes = Nodes ++ AccNodes,
+                  {NAccReleaseNodesMap, NAccNodeReleaseMap, NAccNodes};
+             (Release, {AccReleaseNodesMap, AccNodeReleaseMap, AccNodes}) when is_atom(Release) ->
+                  NAccReleaseNodesMap = maps:put(Release, [Release], AccReleaseNodesMap),
+                  NAccNodeReleaseMap = maps:put(Release, Release, AccNodeReleaseMap),
+                  NAccNodes = [Release|AccNodes],
+                  {NAccReleaseNodesMap, NAccNodeReleaseMap, NAccNodes}
+          end, {maps:new(), maps:new(), []}, NodeList),
+    NState = release_nodes_map(State, ReleaseNodesMap),
+    NNState = node_release_map(NState, NodeReleaseMap),
+    {ok, nodes(NNState, NNodes)};
+load_term({hosts, Hosts}, State) when is_list(Hosts) ->
     NodeMap = 
-        lists:map(
-          fun({NodeName, Host}) ->
-                  {NodeName, binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8)}
-          end, Hosts),
-    NState = hosts(State, Hosts),
-    {ok, node_map(NState, NodeMap)};
+        lists:foldl(
+          fun({Host, Nodes}, Acc) ->
+                  lists:foldl(
+                    fun(NodeName, Acc1) ->
+                            [{NodeName, binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8)}|Acc1]
+                    end, Acc, Nodes)
+          end, [], Hosts),
+    NHosts = maps:from_list(Hosts),
+    NNodeMap = maps:from_list(NodeMap),
+    NState = hosts(State, NHosts),
+    {ok, node_map(NState, NNodeMap)};
 load_term({mnesia_nodes, Nodes}, State) when is_list(Nodes) ->
     MnesiaNodeMap = maps:from_list(Nodes),
     NState = mnesia_nodes(State, MnesiaNodeMap),
@@ -114,119 +144,17 @@ load_term({providers, Providers}, State) ->
 load_term({add_providers, Providers}, State) ->
     NState = added_providers(State, Providers),
     {ok, NState};
+load_term({root, Root}, State) ->
+    NState = root(State, Root),
+    {ok, NState};
+load_term({current_host, CurrentHost}, State) ->
+    NState = current_host(State, CurrentHost),
+    {ok, NState};
+load_term({packages_path, PackagePath}, State) ->
+    NState = packages_path(State, PackagePath),
+    {ok, NState};
 load_term(_Term, State) ->
     {ok, State}.
-
-node_name(#state_t{node_name = NodeName}) ->
-    NodeName.
-
-node_name(#state_t{} = State, NodeName) ->
-    State#state_t{node_name = NodeName}.
-
-cookie(#state_t{cookie = Cookie}) ->
-    Cookie.
-
-cookie(#state_t{} = State, Cookie) ->
-    State#state_t{cookie = Cookie}.
-
-nodes(#state_t{nodes = Nodes}) ->
-    Nodes.
-
-nodes(#state_t{} = State, Nodes) ->
-    State#state_t{nodes = Nodes}.
-
-init_providers(#state_t{init_providers = InitProviders}) ->
-    InitProviders.
-
-init_providers(#state_t{} = State, InitProviders) ->
-    State#state_t{init_providers = InitProviders}.
-
-added_providers(#state_t{added_providers = AddedProviders}) ->
-    AddedProviders.
-
-added_providers(#state_t{} = State, AddedProviders) ->
-    State#state_t{added_providers = AddedProviders}.
-
-started_nodes(#state_t{started_nodes = Nodes}) ->
-    Nodes.
-
-started_nodes(#state_t{} = State, Nodes) ->
-    State#state_t{started_nodes = Nodes}.
-
-add_started_node(#state_t{started_nodes = Nodes} = State, Node) ->
-    State#state_t{started_nodes = [Node|Nodes]}.
-
-unstarted_nodes(#state_t{unstarted_nodes = Nodes}) ->
-    Nodes.
-
-unstarted_nodes(#state_t{} = State, Nodes) ->
-    State#state_t{unstarted_nodes = Nodes}.
-
-add_unstarted_node(#state_t{unstarted_nodes = Nodes} = State, Node) ->
-    State#state_t{unstarted_nodes = [Node|Nodes]}.
-
-undefined_nodes(#state_t{undefined_nodes = Nodes}) ->
-    Nodes.
-
-undefined_nodes(#state_t{} = State, Nodes) ->
-    State#state_t{undefined_nodes = Nodes}.
-
-add_undefined_node(#state_t{undefined_nodes = Nodes} = State, Node) ->
-    State#state_t{undefined_nodes = [Node|Nodes]}.
-
-hosts(#state_t{hosts = Hosts}) ->
-    Hosts.
-
-hosts(#state_t{} = State, HostMap) when is_map(HostMap) ->
-    State#state_t{node_map = HostMap};
-hosts(#state_t{} = State, HostList) when is_list(HostList) ->
-    HostMap = maps:from_list(HostList),
-    State#state_t{hosts = HostMap}.
-
-node_map(#state_t{node_map = NodeMap}) ->
-    NodeMap.
-
-node_map(#state_t{} = State, NodeMap) when is_map(NodeMap) ->
-    State#state_t{node_map = NodeMap};
-node_map(#state_t{} = State, NodeList) when is_list(NodeList) ->
-    NodeMap = maps:from_list(NodeList),
-    State#state_t{node_map = NodeMap}.
-
-mnesia_nodes(#state_t{mnesia_nodes = MnesiaNodes}) ->
-    MnesiaNodes.
-
-mnesia_nodes(#state_t{} = State, MnesiaNodes) ->
-    State#state_t{mnesia_nodes = MnesiaNodes}.
-
-mnesia_schema(#state_t{mnesia_schema = MnesiaSchema}) ->
-    MnesiaSchema.
-
-mnesia_schema(#state_t{} = State, MnesiaSchema) ->
-    State#state_t{mnesia_schema = MnesiaSchema}.
-
-releases(#state_t{releases = Releases}) ->
-    Releases.
-
-releases(#state_t{} = State, Releases) ->
-    State#state_t{releases = Releases}.
-
-application_st(#state_t{application_st = Applications}) ->
-    Applications.
-
-application_st(#state_t{} = State, Applications) ->
-    State#state_t{application_st = Applications}.
-
-main_application_st(#state_t{main_application_st = Applications}) ->
-    Applications.
-
-main_application_st(#state_t{} = State, Applications) ->
-    State#state_t{main_application_st = Applications}.
-
-providers(#state_t{providers=Providers}) ->
-    Providers.
-
-providers(State, NewProviders) ->
-    State#state_t{providers=NewProviders}.
 
 -spec add_provider(t(), providers:t()) -> t().
 add_provider(State=#state_t{providers=Providers, allow_provider_overrides=true}, Provider) ->
@@ -244,6 +172,14 @@ add_provider(State=#state_t{providers=Providers, allow_provider_overrides=false}
             State#state_t{providers=[Provider | Providers]}
     end.
 
+add_started_node(#state_t{started_nodes = Nodes} = State, Node) ->
+    State#state_t{started_nodes = [Node|Nodes]}.
+
+add_unstarted_node(#state_t{unstarted_nodes = Nodes} = State, Node) ->
+    State#state_t{unstarted_nodes = [Node|Nodes]}.
+
+add_undefined_node(#state_t{undefined_nodes = Nodes} = State, Node) ->
+    State#state_t{undefined_nodes = [Node|Nodes]}.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -266,7 +202,7 @@ create_all_providers(State, [Module | Rest]) ->
 provider_exists(P, Module, Name, Namespace) ->
     case {providers:impl(P), providers:namespace(P)} of
         {Name, Namespace} ->
-            lager:debug("Not adding provider ~p ~p from module ~p because it already exists from module ~p",[Namespace, Name, Module, providers:module(P)]),
+            io:format("Not adding provider ~p ~p from module ~p because it already exists from module ~p",[Namespace, Name, Module, providers:module(P)]),
             true;
         _ ->
             false
