@@ -14,7 +14,7 @@
          format_error/1]).
 
 -define(PROVIDER, initialize).
--define(DEPS, [install, start_nodes, mnesia, start_apps]).
+-define(DEPS, [install, start_node, mnesia, start_apps]).
 
 -spec init(cluster_booter_state:t()) -> {ok, cluster_booter_state:t()}.
 init(State) ->

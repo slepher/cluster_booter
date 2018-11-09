@@ -68,6 +68,3 @@ format_error({nodes_unready, Nodes}) when is_list(Nodes) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-create_tables(MnesiaNodes, NodeMap, SchemaModule) ->
-    cluster_booter_mnesia:initialize(MnesiaNodes, NodeMap, SchemaModule).

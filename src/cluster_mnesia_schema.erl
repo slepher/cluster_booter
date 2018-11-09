@@ -11,7 +11,7 @@
 -export([tables/3, node_groups/3, table_nodes/2]).
 -export([table_master_node/2]).
 
--callback(nodes() -> #{atom() := [atom()]}).
+-callback(applications() -> #{atom() := [atom()]}).
 -callback(tables() -> #{atom() := #{name := atom(), table => atom(), indexes => [atom()]}}).
 
 

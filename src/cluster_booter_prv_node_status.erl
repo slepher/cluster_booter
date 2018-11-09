@@ -32,7 +32,8 @@ init(State) ->
 do(State) ->
     NodeNames = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
-    NState = 
+    NState = cluster_booter_state:clear_node_status(State),
+    NNState = 
     lists:foldl(
       fun(NodeName, StateAcc) ->
               case maps:find(NodeName, NodeMap) of
@@ -46,12 +47,13 @@ do(State) ->
                   error ->
                       cluster_booter_state:add_undefined_node(StateAcc, NodeName)
               end
-      end, State, NodeNames),
-    print_node_status(NState),
-    UndefinedNodes = cluster_booter_state:undefined_nodes(State),
+      end, NState, NodeNames),
+    io:format("node status print node status"),
+    print_node_status(NNState),
+    UndefinedNodes = cluster_booter_state:undefined_nodes(NNState),
     case UndefinedNodes of
         [] ->
-            {ok, NState};
+            {ok, NNState};
         _ ->
             {error, {unconfigured_nodes, UndefinedNodes}}
     end.

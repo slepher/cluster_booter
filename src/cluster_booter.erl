@@ -73,7 +73,7 @@ usage(AllProviders) ->
                          Val ->
                              Val
                      end,
-              io:format("~4s~-20s~s~n", ["", Name, Desc]),
+              io:format("~4s~-20s~s~n", ["", Name, Desc])
       end, AllProviders).
 
 -spec format_error(Reason::term()) -> string().

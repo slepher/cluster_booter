@@ -13,7 +13,8 @@
 -export([validate/1]).
 -export([load_terms/2]).
 -export([initialize/1]).
--export([add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
+-export([get_env/2, get_env/3]).
+-export([clear_node_status/1, add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
 -export([add_provider/2, add_to_provider_hooks/3]).
 -export([cmd_opt/2]).
 -export([fold_host_nodes/3, installed/3]).
@@ -66,6 +67,8 @@ validate(_State) ->
 
 cmd_opt(Host, #state_t{current_host = CurrentHost}) ->
     [{host, Host}, {current_host, CurrentHost}].
+
+    
 
 initialize(State) ->
     InitProviders = init_providers(State),
@@ -176,6 +179,13 @@ load_term({env, Env}, State) ->
 load_term(_Term, State) ->
     {ok, State}.
 
+get_env(Key, #state_t{env = Env} = State) ->
+    get_env(Key, State, undefined).
+
+get_env(Key, #state_t{env = Env} = State, Default) ->
+    proplists:get_value(Key, Env, Default).
+
+
 -spec add_provider(t(), providers:t()) -> t().
 add_provider(State=#state_t{providers=Providers, allow_provider_overrides=true}, Provider) ->
     State#state_t{providers=[Provider | Providers]};
@@ -207,6 +217,9 @@ init_provider_hooks(#state_t{providers = Providers, provider_hooks = Hooks} = St
         {error, Reason} ->
             {error, Reason}
     end.
+
+clear_node_status(#state_t{} = State) ->
+    State#state_t{started_nodes = [], unstarted_nodes = [], undefined_nodes = []}.
 
 add_started_node(#state_t{started_nodes = Nodes} = State, Node) ->
     State#state_t{started_nodes = [Node|Nodes]}.

@@ -57,14 +57,12 @@ run(Actions, AllProviders, State) ->
         lists:flatmap(fun(Target) ->
                               providers:get_target_providers(Target, AllProviders)
                       end, Actions),
-    Providers1 = lists:map(fun(P) ->
-                                   providers:get_provider(P, AllProviders)
-                           end, TargetProviders),
-    Providers2 = providers:process_deps(Providers1, AllProviders),
-    lists:foldl(fun(ProviderName, Acc) -> run_provider(ProviderName, AllProviders, Acc) end, {ok, State}, Providers2).
+    io:format("target providers is ~p~n", [TargetProviders]),
+    lists:foldl(fun(ProviderName, Acc) -> run_provider(ProviderName, AllProviders, Acc) end, {ok, State}, TargetProviders).
 
 run_provider(ProviderName, Providers, {ok, State0}) ->
     Provider = providers:get_provider(ProviderName, Providers),
+    io:format("running provider ~p~n", [ProviderName]),
     providers:do(Provider, State0);
 run_provider(_ProviderName, _Providers, Error) ->
     Error.

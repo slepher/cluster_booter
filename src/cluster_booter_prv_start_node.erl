@@ -28,9 +28,6 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    dbg:tracer(),
-    dbg:tpl(cluster_booter_state, node_started, cx),
-    dbg:p(all, [c]),
     BaseDir = cluster_booter_state:root(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, NodeName, ok) ->
@@ -41,7 +38,6 @@ do(State) ->
                               CmdOpt = cluster_booter_state:cmd_opt(Host, State),
                               CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, BaseDir}],
                               Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
-                              io:format("cmd is ~p~n", [Cmd]),
                               os:cmd(Cmd),
                               io:format("start ~p at ~s~n", [Release, Host]);
                           true ->
@@ -51,7 +47,9 @@ do(State) ->
                       io:format("release ~p is not installed at ~s~n", [Release, Host])
               end
       end, ok, State),
-    {ok, State}.
+    timer:sleep(1000),
+    io:format("check not start status~n"),
+    cluster_booter_prv_node_status:do(State).
 
 format_error(_Error) ->
     ok.
