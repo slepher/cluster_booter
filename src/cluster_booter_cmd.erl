@@ -76,6 +76,16 @@ cmd(extract, Args) ->
 cmd(mkdir, Args) ->
     Dir = proplists:get_value(dir, Args),
     "mkdir -p " ++ Dir;
+cmd(version, Args) ->
+    NodeName = proplists:get_value(node_name, Args),
+    ReleaseName = proplists:get_value(release_name, Args),
+    BaseDir = proplists:get_value(base_dir, Args),
+    File = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
+    File ++ " versions";
+cmd(write, Args) ->
+    Source = proplists:get_value(source, Args),
+    File = proplists:get_value(file, Args),
+    {tunnel, "cat " ++ Source, "cat - >" ++ File};
 cmd(exists, Args) ->
     BaseDir = proplists:get_value(base_dir, Args),
     Dirname = 

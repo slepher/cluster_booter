@@ -32,8 +32,13 @@
                   packages_path = ".",
                   packages = maps:new(),
                   installed_packages = maps:new(),
+                  node_versions = maps:new(),
                   root,
                   env = [],
+                  variables = maps:new(),
+                  node_variables = maps:new(),
+                  sys_config,
+                  vm_args,
                   node_name,
                   cookie,
                   nodes = [], 
@@ -85,7 +90,9 @@ initialize(State) ->
                  cluster_booter_prv_installed_packages,
                  cluster_booter_prv_install_packages,
                  cluster_booter_prv_start_node,
-                 cluster_booter_prv_initialize
+                 cluster_booter_prv_initialize,
+                 cluster_booter_prv_versions,
+                 cluster_booter_prv_config
                 ];
             _ ->
                 InitProviders
@@ -176,13 +183,32 @@ load_term({hooks, Hooks}, State) ->
 load_term({env, Env}, State) ->
     NState = env(State, Env),
     {ok, NState};
+load_term({variables, Variables}, State) ->
+    NVariables = maps:from_list(Variables),
+    NState = variables(State, NVariables),
+    {ok, NState};
+load_term({node_variables, NodeVariables}, State) ->
+    NNodeVariables = 
+        lists:foldl(
+          fun({Node, Variables}, Acc) ->
+                  maps:put(Node, maps:from_list(Variables), Acc)
+          end, maps:new(), NodeVariables),
+    NState = node_variables(State, NNodeVariables),
+    {ok, NState};
+load_term({sys_config, SysConfig}, State) ->
+    NState = sys_config(State, SysConfig),
+    {ok, NState};
+load_term({vm_args, VmArgs}, State) ->
+    NState = vm_args(State, VmArgs),
+    {ok, NState};
+
 load_term(_Term, State) ->
     {ok, State}.
 
-get_env(Key, #state_t{env = Env} = State) ->
+get_env(Key, #state_t{} = State) ->
     get_env(Key, State, undefined).
 
-get_env(Key, #state_t{env = Env} = State, Default) ->
+get_env(Key, #state_t{env = Env}, Default) ->
     proplists:get_value(Key, Env, Default).
 
 
@@ -244,10 +270,10 @@ fold_host_nodes(Fun, Init, #state_t{hosts = Hosts, node_release_map = NodeReleas
                 end, Acc, Nodes)
       end, Init, Hosts).
 
-installed(Host, Release, #state_t{installed_packages = InstalledPackages}) ->
+installed(Host, Node, #state_t{installed_packages = InstalledPackages}) ->
    case maps:find(Host, InstalledPackages) of
        {ok, HostInstalled} ->
-           case maps:find(Release, HostInstalled) of
+           case maps:find(Node, HostInstalled) of
                {ok, Installed} ->
                    Installed;
                error ->
