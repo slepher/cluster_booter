@@ -29,6 +29,8 @@ init(State) ->
 
 do(State) ->
     BaseDir = cluster_booter_state:root(State),
+    Nodes = cluster_booter_state:nodes(State),
+    NodeMap = cluster_booter_state:node_map(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, NodeName, ok) ->
               case cluster_booter_state:installed(Host, Release, State) of
@@ -47,8 +49,7 @@ do(State) ->
                       io:format("release ~p is not installed at ~s~n", [Release, Host])
               end
       end, ok, State),
-    timer:sleep(1000),
-    io:format("check not start status~n"),
+    cluster_booter_node:wait(Nodes, NodeMap, 10000),
     cluster_booter_prv_node_status:do(State).
 
 format_error(_Error) ->

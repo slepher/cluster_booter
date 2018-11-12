@@ -55,7 +55,7 @@ set_node_name_and_cookie(State) ->
             ok;
         {error, address} ->
             Epmd = os:find_executable("epmd"),
-            os:cmd(Epmd ++ " -daemon")
+            os:cmd(Epmd ++ " -epmd")
     end,
     net_kernel:start([NodeName, longnames]),
     erlang:set_cookie(node(), Cookie),

@@ -9,13 +9,21 @@
 -module(cluster_booter_node).
 
 %% API
--export([node/2]).
+-export([node/2, wait/3]).
 -export([validate_nodes_started/1]).
 -export([validate_nodes_exists/2, validate_nodes_started/2, validate_nodes_stopped/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+wait(_Nodes, _NodeMap, Timeout) when Timeout < 0 ->
+    ok;
+wait([], __NodeMap, _Timeout) ->
+    ok;
+wait(Nodes, NodeMap, Timeout) ->
+    timer:sleep(1000),
+    RestNodes = validate_nodes_stopped(Nodes, NodeMap),
+    wait(RestNodes, NodeMap, Timeout - 1000).
 
 node(NodeName, Host) ->
     binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8).
