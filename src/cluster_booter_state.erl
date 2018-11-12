@@ -11,6 +11,7 @@
 %% API
 -export([new/0]).
 -export([validate/1]).
+-export([create_all_providers/2]).
 -export([load_terms/2]).
 -export([initialize/1]).
 -export([get_env/2, get_env/3]).
@@ -30,6 +31,8 @@
                   provider_hooks = [],
                   current_host = "localhost",
                   packages_path = ".",
+                  mnesia_dir = ".",
+                  log_dir = ".",
                   packages = maps:new(),
                   installed_packages = maps:new(),
                   node_versions = maps:new(),
@@ -72,8 +75,6 @@ validate(_State) ->
 
 cmd_opt(Host, #state_t{current_host = CurrentHost}) ->
     [{host, Host}, {current_host, CurrentHost}].
-
-    
 
 initialize(State) ->
     InitProviders = init_providers(State),
@@ -201,7 +202,12 @@ load_term({sys_config, SysConfig}, State) ->
 load_term({vm_args, VmArgs}, State) ->
     NState = vm_args(State, VmArgs),
     {ok, NState};
-
+load_term({log_dir, LogDir}, State) ->
+    NState = log_dir(State, LogDir),
+    {ok, NState};
+load_term({mnesia_dir, MnesiaDir}, State) ->
+    NState = mnesia_dir(State, MnesiaDir),
+    {ok, NState};
 load_term(_Term, State) ->
     {ok, State}.
 

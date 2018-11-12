@@ -58,7 +58,7 @@ run(Actions, AllProviders, State) ->
                               providers:get_target_providers(Target, AllProviders)
                       end, Actions),
     io:format("target providers is ~p~n", [TargetProviders]),
-    lists:foldl(fun(ProviderName, Acc) -> run_provider(ProviderName, AllProviders, Acc) end, {ok, State}, TargetProviders).
+    lists:foldl(fun(ProviderName, Acc) -> run_provider(ProviderName, AllProviders, Acc) end, {ok, State}, TargetProviders). 
 
 run_provider(ProviderName, Providers, {ok, State0}) ->
     Provider = providers:get_provider(ProviderName, Providers),

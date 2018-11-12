@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, start_apps).
--define(DEPS, [app_status]).
+-define(DEPS, [start_node, app_status]).
 
 %%%===================================================================
 %%% API

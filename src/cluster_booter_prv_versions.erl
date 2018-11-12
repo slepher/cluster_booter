@@ -30,23 +30,18 @@ init(State) ->
 do(State) ->
     BaseDir = cluster_booter_state:root(State),
     StartedNodes = cluster_booter_state:started_nodes(State),
-    CurrentHost = cluster_booter_state:current_host(State),
     NodeVersions = 
         cluster_booter_state:fold_host_nodes(
           fun(Host, Release, Node, Acc) ->
-                  CmdOpts = [{host, Host}, {current_host, CurrentHost}],
                   case cluster_booter_state:installed(Host, Node, State) of
                       true ->
                           case lists:member(Node, StartedNodes) of
                               true ->
-                                  Args = [{base_dir, BaseDir}, {node_name, Node}, {release_name, Release}],
-                                  Cmd = cluster_booter_cmd:cmd(version, Args, CmdOpts),
-                                  VersionResult = os:cmd(Cmd),
-                                  case parse_version_result(VersionResult) of
-                                      undefined ->
-                                          parse_releas_file_acc(BaseDir, Host, Node, Release, Acc);
-                                      Version ->
-                                          maps:put(Node, Version, Acc)
+                                  case current_release_version(Node) of
+                                      {ok, Version} ->
+                                          maps:put(Node, Version, Acc);
+                                      {error, _Reason} ->
+                                          parse_releas_file_acc(BaseDir, Host, Node, Release, Acc)
                                   end;
                               false ->
                                   parse_releas_file_acc(BaseDir, Host, Node, Release, Acc)
@@ -75,6 +70,17 @@ format_error(Reason) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+current_release_version(TargetNode) ->
+    case cluster_booter:rpc_call(TargetNode, release_handler, which_releases, [[], 6000]) of
+        {error, Reason} ->
+            {error, Reason};
+        R ->
+            Versions = [ {S, V} ||  {_,V,_, S} <- R ],
+            %% current version takes priority over the permanent
+            {ok, proplists:get_value(current, Versions,
+                                     proplists:get_value(permanent, Versions))}
+    end.
 
 format_node_versions(NodeVersions) ->
     maps:fold(

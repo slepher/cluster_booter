@@ -75,7 +75,7 @@ cmd(extract, Args) ->
     {tunnel, "cat " ++ Filename, " tar zxf - -C "  ++ filename:join(BaseDir, Nodename)};
 cmd(mkdir, Args) ->
     Dir = proplists:get_value(dir, Args),
-    "mkdir -p " ++ Dir;
+    "[ -d " ++ Dir ++ " ] || mkdir -p " ++ Dir;
 cmd(version, Args) ->
     NodeName = proplists:get_value(node_name, Args),
     ReleaseName = proplists:get_value(release_name, Args),

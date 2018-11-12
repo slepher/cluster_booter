@@ -23,7 +23,7 @@ node_applications(Nodes, NodeMap) ->
                       {error, Reason} ->
                           NErrorAcc = maps:put(Node, {error, Reason}, ErrorAcc),
                           {OkAcc, NErrorAcc};
-                      RunningApplications ->
+                      {ok, RunningApplications} ->
                           RunningApplicationMap = 
                               lists:foldl(
                                 fun({Application, _Desc, Version}, Acc) ->

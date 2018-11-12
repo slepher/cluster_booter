@@ -11,7 +11,7 @@
 -compile({parse_transform, do}).
 
 %% API
--export([rpc_call/4]).
+-export([rpc_call/4, return_mnesia_rpc/2]).
 -export([main/1, format_error/1]).
 %%%===================================================================
 %%% API
@@ -98,6 +98,20 @@ rpc_call(Node, Module, Function, Args) ->
         {ok, Val} ->
             {ok, Val};
         {error, Reason} ->
+            {error, Reason};
+        {badrpc, nodedown} ->
+            {error, nodedown};
+        {badrpc, Reason} ->
+            {error, {badrpc, Node, Reason}};
+        Other ->
+            {ok, Other}
+    end.
+
+return_mnesia_rpc(Node, Value) ->
+    case Value of
+        {atomic, Val} ->
+            {ok, Val};
+        {aborted, Reason} ->
             {error, Reason};
         {badrpc, nodedown} ->
             {error, nodedown};
