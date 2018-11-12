@@ -59,7 +59,9 @@ validate_nodes_stopped(Nodes, NodeMap) ->
     lists:filter(
       fun(NodeName) ->
               Node = maps:get(NodeName, NodeMap),
-              net_adm:ping(Node) == pong
+              Result = net_adm:ping(Node),
+              io:format("node result ~p ~p~n", [NodeName, Result]),
+              Result == pong
       end, Nodes).
 
 %%--------------------------------------------------------------------

@@ -48,7 +48,6 @@ do(State) ->
                       cluster_booter_state:add_undefined_node(StateAcc, NodeName)
               end
       end, NState, NodeNames),
-    io:format("node status print node status"),
     print_node_status(NNState),
     UndefinedNodes = cluster_booter_state:undefined_nodes(NNState),
     case UndefinedNodes of
