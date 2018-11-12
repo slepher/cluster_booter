@@ -72,10 +72,8 @@ do(State) ->
                         end
                 end, Nodes)
       end, ok, Hosts),
-  
-                                                                     
-    {ok, State}.
-    
+    cluster_booter_prv_installed_packages:do(State).
+
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
