@@ -21,9 +21,9 @@ wait(_Nodes, _NodeMap, Timeout) when Timeout < 0 ->
 wait([], __NodeMap, _Timeout) ->
     ok;
 wait(Nodes, NodeMap, Timeout) ->
-    timer:sleep(1000),
+    timer:sleep(200),
     RestNodes = validate_nodes_stopped(Nodes, NodeMap),
-    wait(RestNodes, NodeMap, Timeout - 1000).
+    wait(RestNodes, NodeMap, Timeout - 200).
 
 node(NodeName, Host) ->
     binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8).
