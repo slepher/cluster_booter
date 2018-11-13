@@ -86,6 +86,9 @@ cmd(write, Args) ->
     Source = proplists:get_value(source, Args),
     File = proplists:get_value(file, Args),
     {tunnel, "cat " ++ Source, "cat - >" ++ File};
+cmd(read, Args) ->
+    File = proplists:get_value(file, Args),
+    "[ -f " ++ File ++ " ] && cat " ++ File;
 cmd(exists, Args) ->
     BaseDir = proplists:get_value(base_dir, Args),
     Dirname = 

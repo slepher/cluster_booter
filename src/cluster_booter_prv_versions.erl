@@ -30,9 +30,11 @@ init(State) ->
 do(State) ->
     BaseDir = cluster_booter_state:root(State),
     StartedNodes = cluster_booter_state:started_nodes(State),
+    CurrentHost = cluster_booter_state:current_host(State),
     NodeVersions = 
         cluster_booter_state:fold_host_nodes(
           fun(Host, Release, Node, Acc) ->
+                  CmdOpts = [{host, Host}, {current_host, CurrentHost}],
                   case cluster_booter_state:installed(Host, Node, State) of
                       true ->
                           case lists:member(Node, StartedNodes) of
@@ -41,10 +43,10 @@ do(State) ->
                                       {ok, Version} ->
                                           maps:put(Node, Version, Acc);
                                       {error, _Reason} ->
-                                          parse_releas_file_acc(BaseDir, Host, Node, Release, Acc)
+                                          parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc)
                                   end;
                               false ->
-                                  parse_releas_file_acc(BaseDir, Host, Node, Release, Acc)
+                                  parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc)
                           end;
                       _ ->
                           Acc
@@ -88,8 +90,8 @@ format_node_versions(NodeVersions) ->
               io:format("version of ~p is ~p~n", [Node, Version])
       end, ok, NodeVersions).
 
-parse_releas_file_acc(BaseDir, Host, Node, Release, Acc) ->
-    case parse_releas_file(BaseDir, Node, Release) of
+parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc) ->
+    case parse_release_file(BaseDir, Node, Release, CmdOpts) of
         {ok, Version} ->
             maps:put(Node, Version, Acc);
         {error, Reason} ->
@@ -97,26 +99,21 @@ parse_releas_file_acc(BaseDir, Host, Node, Release, Acc) ->
             Acc
     end.
 
-parse_releas_file(BaseDir, Node, Release) ->
+parse_release_file(BaseDir, Node, _Release, CmdOpts) ->
     Filename = filename:join([BaseDir, Node, "releases/RELEASES"]), 
-    case file:consult(Filename) of
-        {ok, [[{release, _, Version, _, _, _}]]} ->
-            {ok, Version};
-        {error, Reason} ->
-            {error, Reason}
+    Cmd = cluster_booter_cmd:cmd(read, [{file, Filename}], CmdOpts),
+    case os:cmd(Cmd) of
+        [] ->
+            {error, file_not_exists};
+        Content ->
+            {ok, Tokens, _EndLine} = erl_scan:string(Content),
+            {ok, AbsForm} = erl_parse:parse_exprs(Tokens),
+            {value,Value, _Bs} = erl_eval:exprs(AbsForm, erl_eval:new_bindings()),
+            case Value of
+                [{release, _, Version, _, _, _}] ->
+                    {ok, Version};
+                {error, Reason} ->
+                    {error, Reason}
+            end
     end.
-            
-parse_version_result(VersionResult) ->
-    VersionLines = string:split(VersionResult, "\n", all),
-    parse_version_lines(VersionLines).
-
-parse_version_lines([VersionLine|Rest]) ->
-    case string:split(VersionLine, " ", all) of
-        ["*", Version, "permanent\n"] ->
-            Version;
-        _ ->
-            parse_version_lines(Rest)
-    end;
-parse_version_lines([]) ->
-    undefined.
 
