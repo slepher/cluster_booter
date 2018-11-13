@@ -30,7 +30,7 @@ init(State) ->
 do(State) ->
     MainApplicationSt = cluster_booter_state:main_application_st(State),
     NodeMap = cluster_booter_state:node_map(State),
-    MnesiaNodes = cluster_booter_state:mnesia_nodes(State),
+    MnesiaNodes = lists:flatten(maps:values(cluster_booter_state:mnesia_nodes(State))),
     case cluster_booter_mnesia:boot_mnesia(MnesiaNodes, NodeMap) of
         {ok, ok} ->
             case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
