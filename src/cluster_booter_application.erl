@@ -9,7 +9,7 @@
 -module(cluster_booter_application).
 
 %% API
--export([application_st/2, node_applications/2, boot_application/3, boot_applications/2]).
+-export([application_st/2, node_applications/2, boot_application/2, boot_application/3, boot_applications/2]).
 
 %%%===================================================================
 %%% API
@@ -58,6 +58,9 @@ application_st(NodeMainApps, NodeApplicationMap) ->
                       Acc
               end
       end, maps:new(), NodeMainApps).
+
+boot_application([NodeName, Application], NodeMap) ->
+    boot_application(NodeName, Application, NodeMap).
 
 boot_application(NodeName, Application, NodeMap) ->
     Node = maps:get(NodeName, NodeMap),

@@ -49,6 +49,8 @@ do(Options, NonOptions) ->
 
 set_node_name_and_cookie(State) ->
     NodeName = cluster_booter_state:node_name(State),
+    CurrentHost = cluster_booter_state:current_host(State),
+    Node = list_to_atom(atom_to_list(NodeName) ++ "@" ++ CurrentHost),
     Cookie = cluster_booter_state:cookie(State),
     case net_adm:names() of
         {ok, _} -> %% Epmd is running
@@ -57,7 +59,7 @@ set_node_name_and_cookie(State) ->
             Epmd = os:find_executable("epmd"),
             os:cmd(Epmd ++ " -daemon")
     end,
-    net_kernel:start([NodeName, longnames]),
+    net_kernel:start([Node, longnames]),
     erlang:set_cookie(node(), Cookie),
     ok.
 

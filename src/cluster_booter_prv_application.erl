@@ -30,9 +30,15 @@ init(State) ->
 do(State) ->
     MainApplicationSt = cluster_booter_state:main_application_st(State),
     NodeMap = cluster_booter_state:node_map(State),
-    case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
+    MnesiaNodes = cluster_booter_state:mnesia_nodes(State),
+    case cluster_booter_mnesia:boot_mnesia(MnesiaNodes, NodeMap) of
         {ok, ok} ->
-            {ok, State};
+            case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
+                {ok, ok} ->
+                    {ok, State};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.

@@ -19,7 +19,7 @@
          init_datas/3,
          drop_tables/1
         ]).
--export([validate_nodes/0, validate_nodes/1]).
+-export([validate_nodes/0, validate_nodes/1, boot_mnesia/2]).
 -export([cluster_nodes/2, master_node/1, tables/1, validate_schema/1,
          cookie_tables_map/1]).
 
