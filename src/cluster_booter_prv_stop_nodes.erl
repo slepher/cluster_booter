@@ -4,15 +4,15 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  2 Nov 2018 by Chen Slepher <slepheric@gmail.com>
+%%% Created : 14 Nov 2018 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
--module(cluster_booter_prv_application).
+-module(cluster_booter_prv_stop_nodes).
 
 -export([init/1, do/1, format_error/1]).
 
 %% API
--define(PROVIDER, start_apps).
--define(DEPS, [start_nodes, app_status]).
+-define(PROVIDER, stop_nodes).
+-define(DEPS, []).
 
 %%%===================================================================
 %%% API
@@ -22,29 +22,39 @@ init(State) ->
     Provider = providers:create([{name, ?PROVIDER},
                                  {module, ?MODULE},
                                  {deps, ?DEPS},
-                                 {desc, "start erlang applications on already started nodes."}
+                                 {desc, "stop erlang nodes."}
                                 ]),
     State1 = cluster_booter_state:add_provider(State, Provider),
     {ok, State1}.
 
 do(State) ->
-    MainApplicationSt = cluster_booter_state:main_application_st(State),
+    Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
-    MnesiaNodes = lists:flatten(maps:values(cluster_booter_state:mnesia_nodes(State))),
-    case cluster_booter_mnesia:boot_mnesia(MnesiaNodes, NodeMap) of
-        {ok, ok} ->
-            case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
-                {ok, ok} ->
-                    {ok, State};
-                {error, Reason} ->
-                    {error, Reason}
-            end;
+    case cluster_booter_prv_node_status:do(State) of
+        {ok, NState} ->
+            cluster_booter_state:fold_host_nodes(
+              fun(Host, Release, NodeName, ok) ->
+                      case cluster_booter_state:node_started(NodeName, NState) of
+                          false ->
+                              io:format("node ~p is already stoppped at ~s~n", [NodeName, Host]);
+                          true ->
+                              Node = maps:get(NodeName, NodeMap),
+                              case cluster_booter:rpc_call(Node, init, stop, []) of
+                                  ok ->
+                                      io:format("node ~p is stopped at ~s~n", [Release, Host]);
+                                  {error, Reason} ->
+                                      io:format("node ~p is stop failed ~p at ~s~n", [Release, Reason, Host])
+                              end
+                      end
+              end, ok, NState),
+            cluster_booter_node:wait(Nodes, NodeMap, 10000, stopped),
+            cluster_booter_prv_node_status:do(NState);
         {error, Reason} ->
             {error, Reason}
     end.
 
-format_error({application_not_started, Result}) ->
-    io_lib:format("application start failed ~p", [Result]).
+format_error(_Error) ->
+    ok.
 
 %%%===================================================================
 %%% API
@@ -59,3 +69,4 @@ format_error({application_not_started, Result}) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+

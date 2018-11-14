@@ -9,25 +9,31 @@
 -module(cluster_booter_node).
 
 %% API
--export([node/2, wait/3]).
+-export([node/2, wait/4]).
 -export([validate_nodes_started/1]).
--export([validate_nodes_exists/2, validate_nodes_started/2, validate_nodes_stopped/2]).
+-export([validate_nodes_exists/2, nodes_started/2, nodes_stopped/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
-wait(_Nodes, _NodeMap, Timeout) when Timeout < 0 ->
+wait(Nodes, _NodeMap, Timeout, Status) when Timeout < 0 ->
+    io:format("timeout wait nodes ~p ~p.~n", [Nodes, Status]),
     ok;
-wait([], __NodeMap, _Timeout) ->
+wait([], __NodeMap, _Timeout, _Status) ->
     ok;
-wait(Nodes, NodeMap, Timeout) ->
+wait(Nodes, NodeMap, Timeout, Status) ->
     timer:sleep(200),
-    RestNodes = validate_nodes_stopped(Nodes, NodeMap),
-    wait(RestNodes, NodeMap, Timeout - 200).
+    RestNodes = 
+        case Status of
+            stopped ->
+                nodes_started(Nodes, NodeMap);
+            started ->
+                nodes_stopped(Nodes, NodeMap)
+        end,
+    wait(RestNodes, NodeMap, Timeout - 200, Status).
 
 node(NodeName, Host) ->
     binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8).
-
 
 validate_nodes_exists(Nodes, NodeMap) ->
     lists:foldl(
@@ -48,18 +54,18 @@ validate_nodes_started(Nodes) ->
               net_adm:ping(Node) == pang
       end, Nodes).
 
-validate_nodes_started(Nodes, NodeMap) ->
-    lists:filter(
-      fun(NodeName) ->
-              Node = maps:get(NodeName, NodeMap),
-              net_adm:ping(Node) == pang
-      end, Nodes).
-
-validate_nodes_stopped(Nodes, NodeMap) ->
+nodes_started(Nodes, NodeMap) ->
     lists:filter(
       fun(NodeName) ->
               Node = maps:get(NodeName, NodeMap),
               net_adm:ping(Node) == pong
+      end, Nodes).
+
+nodes_stopped(Nodes, NodeMap) ->
+    lists:filter(
+      fun(NodeName) ->
+              Node = maps:get(NodeName, NodeMap),
+              net_adm:ping(Node)  == pang
       end, Nodes).
 
 %%--------------------------------------------------------------------

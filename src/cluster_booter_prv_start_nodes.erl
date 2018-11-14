@@ -6,12 +6,12 @@
 %%% @end
 %%% Created :  7 Nov 2018 by Chen Slepher <slepheric@gmail.com>
 %%%-------------------------------------------------------------------
--module(cluster_booter_prv_start_node).
+-module(cluster_booter_prv_start_nodes).
 
 -export([init/1, do/1, format_error/1]).
 
 %% API
--define(PROVIDER, start_node).
+-define(PROVIDER, start_nodes).
 -define(DEPS, [installed, node_status, config]).
 
 %%%===================================================================
@@ -49,7 +49,7 @@ do(State) ->
                       io:format("release ~p is not installed at ~s~n", [Release, Host])
               end
       end, ok, State),
-    cluster_booter_node:wait(Nodes, NodeMap, 10000),
+    cluster_booter_node:wait(Nodes, NodeMap, 10000, started),
     cluster_booter_prv_node_status:do(State).
 
 format_error(_Error) ->

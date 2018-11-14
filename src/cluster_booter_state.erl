@@ -90,10 +90,11 @@ initialize(State) ->
                  cluster_booter_prv_packages,
                  cluster_booter_prv_installed_packages,
                  cluster_booter_prv_install_packages,
-                 cluster_booter_prv_start_node,
+                 cluster_booter_prv_start_nodes,
                  cluster_booter_prv_initialize,
                  cluster_booter_prv_versions,
-                 cluster_booter_prv_config
+                 cluster_booter_prv_config,
+                 cluster_booter_prv_stop_nodes
                 ];
             _ ->
                 InitProviders

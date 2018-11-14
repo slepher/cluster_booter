@@ -37,7 +37,7 @@ do(State) ->
     case UNodeNames of
         [] ->
             Nodes = maps:values(maps:with(NodeNames, NodeMap)),
-            case cluster_booter_node:validate_nodes_started(Nodes) of
+            case cluster_booter_node:nodes_stopped(Nodes) of
                 [] ->
                     {ok, State};
                 Unstarted ->

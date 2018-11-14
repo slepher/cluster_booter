@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, mnesia).
--define(DEPS, [start_node]).
+-define(DEPS, [start_nodes]).
 
 %%%===================================================================
 %%% API

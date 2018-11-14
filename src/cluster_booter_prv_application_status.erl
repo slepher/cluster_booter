@@ -14,7 +14,7 @@
          format_error/1]).
 
 -define(PROVIDER, app_status).
--define(DEPS, [node_status, start_node]).
+-define(DEPS, [node_status, start_nodes]).
 
 %%%===================================================================
 %%% API
