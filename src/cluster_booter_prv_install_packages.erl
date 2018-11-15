@@ -39,8 +39,6 @@ do(State) ->
     Fun = fun(Host, Node, Release, Version) ->
                   Opts = [{host, Host}, {current_host, CurrentHost}],
                   mkdir(filename:join(Root, Node), Opts),
-                  mkdir(filename:join(Root, MnesiaDir), Opts),
-                  mkdir(filename:join(Root, LogDir), Opts),
                   Args = [{release, Release}, {version, Version},
                           {node_name, Node}, {base_dir, Root}, {packages_path, PackagesPath}],
                   Cmd = cluster_booter_cmd:cmd(extract, Args, Opts),
@@ -49,6 +47,9 @@ do(State) ->
           end,
     maps:fold(
       fun(Host, Nodes, ok) ->
+              Opts = [{host, Host}, {current_host, CurrentHost}],
+              mkdir(filename:join(Root, MnesiaDir), Opts),
+              mkdir(filename:join(Root, LogDir), Opts),
               InstalledPackages = maps:get(Host, HostInstalledPackages, maps:new()),
               lists:foreach(
                 fun(Node) ->
