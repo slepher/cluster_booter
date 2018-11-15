@@ -39,8 +39,9 @@ do(State) ->
     Fun = fun(Host, Node, Release, Version) ->
                   Opts = [{host, Host}, {current_host, CurrentHost}],
                   mkdir(filename:join(Root, Node), Opts),
-                  Args = [{release, Release}, {version, Version},
-                          {node_name, Node}, {base_dir, Root}, {packages_path, PackagesPath}],
+                  Filename = filename:join(PackagesPath, atom_to_list(Release) ++ "-" ++ Version ++ ".tar.gz"),
+                  TargetDirectory = filename:join(Root, Node),
+                  Args = [{filename, Filename}, {target_directory, TargetDirectory}],
                   Cmd = cluster_booter_cmd:cmd(extract, Args, Opts),
                   io:format("cmd is ~s~n", [Cmd]),
                   os:cmd(Cmd)

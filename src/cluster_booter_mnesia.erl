@@ -202,10 +202,10 @@ init_datas(MasterNode, Table, Datas) ->
                                           mnesia:write(Table, Data, write)
                                   end, Datas)
                           end, Datas, Table),
-                    case f:return(rpc:call(Node, mnesia, transaction, [F])) of
-                        {ok, ok} ->
+                    case rpc:call(Node, mnesia, transaction, [F]) of
+                        {atomic, ok} ->
                             ok;
-                        {error, Reason} ->
+                        {aborted, Reason} ->
                             {error, Reason}
                     end;
                 {error, Reason} ->

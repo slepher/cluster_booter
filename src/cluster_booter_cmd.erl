@@ -66,13 +66,9 @@ cmd(start_boot, Args) ->
     Start = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
     Start ++ " start_boot load";
 cmd(extract, Args) ->
-    Release = proplists:get_value(release, Args),
-    Version = proplists:get_value(version, Args),
-    PackagesPath = proplists:get_value(packages_path, Args),
-    Filename = filename:join(PackagesPath, atom_to_list(Release) ++ "-" ++ Version ++ ".tar.gz"),
-    Nodename = proplists:get_value(node_name, Args),
-    BaseDir = proplists:get_value(base_dir, Args),
-    {tunnel, "cat " ++ Filename, " tar zxf - -C "  ++ filename:join(BaseDir, Nodename)};
+    Filename = proplists:get_value(filename, Args),
+    TargetDirectory = proplists:get_value(target_directory, Args),
+    {tunnel, "cat " ++ Filename, " tar zxf - -C "  ++ TargetDirectory};
 cmd(mkdir, Args) ->
     Dir = proplists:get_value(dir, Args),
     "[ -d " ++ Dir ++ " ] || mkdir -p " ++ Dir;
