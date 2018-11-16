@@ -14,7 +14,7 @@
 -export([create_all_providers/2]).
 -export([load_terms/2]).
 -export([initialize/1]).
--export([get_env/2, get_env/3]).
+-export([get_env/2, get_env/3, get_node/2]).
 -export([clear_node_status/1, add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
 -export([add_provider/2, add_to_provider_hooks/3]).
 -export([cmd_opt/2]).
@@ -218,6 +218,9 @@ get_env(Key, #state_t{} = State) ->
 get_env(Key, #state_t{env = Env}, Default) ->
     proplists:get_value(Key, Env, Default).
 
+get_node(NodeName, #state_t{} = State) ->
+    NodeMap = cluster_booter_state:node_map(State),
+    maps:get(NodeName, NodeMap).
 
 -spec add_provider(t(), providers:t()) -> t().
 add_provider(State=#state_t{providers=Providers, allow_provider_overrides=true}, Provider) ->
