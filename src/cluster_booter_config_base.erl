@@ -24,26 +24,23 @@ config_file(CmdTerms, ConfigFileFlag, DefaultConfigFile) ->
     end.
 
 config(CmdTerms, ConfigFile) ->
-    case config_from_file(ConfigFile) of
+    case config_from_file(CmdTerms, ConfigFile) of
         {error, Reason} ->
             {error, Reason};
         ConfigTerms ->
             merge_configs(CmdTerms, ConfigTerms)
     end.
 
-config_from_file(ConfigFile) ->
-    {ok, CurrentCwd} = file:get_cwd(),
+config_from_file(CmdTerms, ConfigFile) ->
     Config0 = case filelib:is_regular(ConfigFile) of
                   true ->
-                      ok = file:set_cwd(filename:dirname(ConfigFile)),
-                      Result = case file:consult(ConfigFile) of
-                                   {error, Reason} ->
-                                       {error, {consult, ConfigFile, Reason}};
-                                   {ok, Terms} -> 
-                                       {ok, Terms}
-                               end,
-                      ok = file:set_cwd(CurrentCwd),
-                      Result;
+                      VariableFile = variable_file(CmdTerms, ConfigFile),
+                      case variables(VariableFile) of
+                          {ok, Variables} ->
+                              consult_with_variables(Variables, ConfigFile);
+                          {error, Reason} ->
+                              {error, Reason}
+                      end;
                   false -> 
                       {error, no_exists}
               end,
@@ -57,6 +54,36 @@ config_from_file(ConfigFile) ->
                 false -> Config0;
                 true -> apply_config_script(Config0, ConfigScriptFile)
             end
+    end.
+
+consult_with_variables([], ConfigFile) ->
+    case file:consult(ConfigFile) of
+        {error, Reason} ->
+            {error, {consult, ConfigFile, Reason}};
+        {ok, Terms} -> 
+            {ok, Terms}
+    end;
+consult_with_variables(Variables, ConfigFile) ->
+    NVariables = lists:map(fun({K, V}) -> {atom_to_list(K), V} end, Variables),
+    ConfigTemplate = bbmustache:parse_file(ConfigFile),
+    ConfigString = bbmustache:compile(ConfigTemplate, NVariables),
+    Configs = cluster_booter_terms:scan_binary(ConfigString),
+    {ok, Configs}.
+
+variable_file(_CmdTerms, ConfigFile) ->
+    ConfigFile ++ ".vars".
+    
+variables(ConfigVariableFile) ->
+    case filelib:is_regular(ConfigVariableFile) of
+        true ->
+            case file:consult(ConfigVariableFile) of
+                {error, Reason} ->
+                    {error, {consult, ConfigVariableFile, Reason}};
+                {ok, Terms} ->
+                    {ok, Terms}
+            end;
+        false ->
+            {ok, []}
     end.
 
 merge_configs([], ConfigTerms) ->
