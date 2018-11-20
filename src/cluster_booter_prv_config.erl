@@ -38,6 +38,7 @@ do(State) ->
                       SysConfigTemplate = bbmustache:parse_file(SysConfig),
                       VMArgsTemplate = bbmustache:parse_file(VMArgs),
                       FVariables = update_node_variables(Release, Node, State),
+                      io:format("update node variables ~p~p~n", [Node, FVariables]),
                       SysConfigResult = bbmustache:compile(SysConfigTemplate, FVariables),
                       VMArgResult = bbmustache:compile(VMArgsTemplate, FVariables),
                       Dir = filename:join([BaseDir, Node, "releases", Version]),
@@ -88,6 +89,7 @@ write_file(Dir, Name, Data, CmdOpts) ->
     file:write_file(TempFile, Data),
     Filename = filename:join([Dir, Name]),
     Cmd = cluster_booter_cmd:cmd(write, [{file, Filename}, {source, TempFile}], CmdOpts),
-    os:cmd(Cmd).
+    os:cmd(Cmd),
+    file:delete(TempFile).
 
     
