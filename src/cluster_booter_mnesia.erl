@@ -8,7 +8,8 @@
 %%%-------------------------------------------------------------------
 -module(cluster_booter_mnesia).
 
--compile({parse_transform, rpc_function_transform}).
+-compile({parse_transform, ast_macro}).
+-import_macro({rpc_function, transform, []}).
 
 %% API
 -export([validate_mnesia_clusters/2, validate_mnesia_cluster/2]).
@@ -195,7 +196,7 @@ init_datas(MasterNode, Table, Datas) ->
         _ ->
             case cluster_mnesia_schema:table_master_node(MasterNode, Table) of
                 {ok, Node} ->
-                    F = rpc_fun(
+                    F = rpc_function:transform(
                           fun () ->
                                 lists:foreach(
                                   fun(Data) ->
