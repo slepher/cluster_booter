@@ -12,26 +12,30 @@
 
 %% API
 -export([rpc_call/4, return_mnesia_rpc/2]).
--export([main/1, format_error/1]).
+-export([main/1, main/2, format_error/1]).
 %%%===================================================================
 %%% API
 %%%===================================================================
 main(Args) ->
-    {ok, _} = application:ensure_all_started(erlando),
+    main(Args, []).
+
+main(Args, Opts) ->
     case getopt:parse([], Args) of
         {ok, {Options, NonOptions}} ->
-            do(Options, NonOptions);
+            do(Options ++ Opts, NonOptions);
         {error, Detail} ->
             format_error(Detail)
     end.
 
 do(Options, NonOptions) ->
     State = cluster_booter_state:new(),
+    DefaultConfig = cluster_booter_config_base:default_config(Options),
     ConfigFile = cluster_booter_config_base:config_file(Options, config, "booter.config"),
     Result = 
         do([error_m ||
                Config <- cluster_booter_config_base:config(Options, ConfigFile),
-               NState <- cluster_booter_state:load_terms(Config, State),
+               NConfig = cluster_booter_config_base:merge_configs(Config, DefaultConfig),
+               NState <- cluster_booter_state:load_terms(NConfig, State),
                cluster_booter_state:validate(NState),
                NNState <- cluster_booter_state:initialize(NState),
                set_node_name_and_cookie(NNState),

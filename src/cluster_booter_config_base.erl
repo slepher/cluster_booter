@@ -9,11 +9,24 @@
 -module(cluster_booter_config_base).
 
 %% API
--export([config/2, config_file/3]).
+-export([default_config/1, merge_configs/2, config/2, config_file/3]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+default_config(Opts) ->
+    case proplists:get_value(default_config_module, Opts) of
+        undefined ->
+            [];
+        Module ->
+            try 
+                Module:config()
+            catch
+                _:_:_ ->
+                    []
+            end
+    end.
 
 config_file(CmdTerms, ConfigFileFlag, DefaultConfigFile) ->
     case proplists:get_value(ConfigFileFlag, CmdTerms) of
@@ -27,8 +40,8 @@ config(CmdTerms, ConfigFile) ->
     case config_from_file(CmdTerms, ConfigFile) of
         {error, Reason} ->
             {error, Reason};
-        ConfigTerms ->
-            merge_configs(CmdTerms, ConfigTerms)
+        {ok, ConfigTerms} ->
+            {ok, merge_configs(CmdTerms, ConfigTerms)}
     end.
 
 config_from_file(CmdTerms, ConfigFile) ->
@@ -93,32 +106,7 @@ merge_configs([{_Key, undefined} | CliTerms], ConfigTerms) ->
 merge_configs([{_Key, []} | CliTerms], ConfigTerms) ->
     merge_configs(CliTerms, ConfigTerms);
 merge_configs([{Key, Value} | CliTerms], ConfigTerms) ->
-    case Key of
-        X when X =:= lib_dirs
-             ; X =:= goals
-             ; X =:= overrides ->
-            case lists:keyfind(Key, 1, ConfigTerms) of
-                {Key, Value2} ->
-                    MergedValue = lists:umerge([Value, Value2]),
-                    merge_configs(CliTerms, lists:keyreplace(Key, 1, ConfigTerms, {Key, MergedValue}));
-                false ->
-                    merge_configs(CliTerms, ConfigTerms++[{Key, Value}])
-            end;
-        overlay_vars ->
-            case lists:keyfind(overlay_vars, 1, ConfigTerms) of
-                {_, [H | _] = Vars} when is_list(H) ;
-                                         is_tuple(H) ->
-                    MergedValue = Vars ++ Value,
-                    merge_configs(CliTerms, lists:keyreplace(overlay_vars, 1, ConfigTerms, {Key, MergedValue}));
-                {_, Vars} when is_list(Vars) ->
-                    MergedValue = [Vars | Value],
-                    merge_configs(CliTerms, lists:keyreplace(overlay_vars, 1, ConfigTerms, {Key, MergedValue}));
-                false ->
-                    merge_configs(CliTerms, ConfigTerms++[{Key, Value}])
-            end;
-        _ ->
-            merge_configs(CliTerms, lists:reverse(lists:keystore(Key, 1, lists:reverse(ConfigTerms), {Key, Value})))
-    end.
+    merge_configs(CliTerms, lists:reverse(lists:keystore(Key, 1, lists:reverse(ConfigTerms), {Key, Value}))).
 
 -spec config_script_file(file:filename()) -> file:filename().
 config_script_file(ConfigFile) ->
