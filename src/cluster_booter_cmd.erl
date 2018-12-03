@@ -69,7 +69,8 @@ cmd(extract, Args) ->
     Filename = proplists:get_value(filename, Args),
     TargetDirectory = proplists:get_value(target_directory, Args),
     ExtractType = proplists:get_value(extract_type, Args, "zxf"),
-    {tunnel, "cat " ++ Filename, " tar " ++ ExtractType ++ " - -C "  ++ TargetDirectory};
+    Strip = proplists:get_value(strip, Args, 0),
+    {tunnel, "cat " ++ Filename, " tar " ++ ExtractType ++ " - --strip-components=" ++ Strip ++ " -C "  ++ TargetDirectory};
 cmd(mkdir, Args) ->
     Dir = proplists:get_value(dir, Args),
     "[ -d " ++ Dir ++ " ] || mkdir -p " ++ Dir;
