@@ -9,17 +9,19 @@
 -module(cluster_booter_cmd).
 
 %% API
--export([cmd/3]).
+-export([cmd/2, cmd/3]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
-    
-cmd(CmdType, CmdArgs, Opts) ->
+cmd(Cmd, Opts) ->
     Host = proplists:get_value(host, Opts),
     CurrentHost = proplists:get_value(current_host, Opts),
-    IsLocalhost = localhost(Host, CurrentHost),
-    host_cmd(Host, IsLocalhost, CmdType, CmdArgs).
+    host_cmd(Host, CurrentHost, Cmd).
+
+cmd(CmdType, CmdArgs, Opts) ->
+    Cmd = gen_cmd(CmdType, CmdArgs),
+    cmd(Cmd, Opts).
 
 localhost(undefined, _) ->
     true;
@@ -32,9 +34,9 @@ localhost(Host, Host) ->
 localhost(_Host, _CurrentHost) ->
     false.
     
-host_cmd(Host, IsLocalHost, CmdType, Args) ->
-    Cmd = cmd(CmdType, Args),
-    case IsLocalHost of
+host_cmd(Host, CurrentHost, Cmd) ->
+    IsLocalhost = localhost(Host, CurrentHost),
+    case IsLocalhost of
         true ->
             tunnel_cmd(Cmd);
         false ->
@@ -51,43 +53,43 @@ ssh_cmd(Host, {tunnel, Before, Cmd}) ->
 ssh_cmd(Host, Cmd) when is_list(Cmd) ->
     lists:flatten("ssh " ++ Host ++ " \"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
 
-cmd(processes, _) ->
+gen_cmd(processes, _) ->
     "ps aux | grep setcookie | sed 's/  */ /g' | cut -f 11- -d ' '";
-cmd(start, Args) ->
+gen_cmd(start, Args) ->
     NodeName = proplists:get_value(node_name, Args),
     ReleaseName = proplists:get_value(release_name, Args),
     BaseDir = proplists:get_value(base_dir, Args),
     Start = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
     Start ++ " start";
-cmd(start_boot, Args) ->
+gen_cmd(start_boot, Args) ->
     NodeName = proplists:get_value(node_name, Args),
     ReleaseName = proplists:get_value(release_name, Args),
     BaseDir = proplists:get_value(base_dir, Args),
     Start = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
     Start ++ " start_boot load";
-cmd(extract, Args) ->
+gen_cmd(extract, Args) ->
     Filename = proplists:get_value(filename, Args),
     TargetDirectory = proplists:get_value(target_directory, Args),
     ExtractType = proplists:get_value(extract_type, Args, "zxf"),
     Strip = integer_to_list(proplists:get_value(strip, Args, 0)),
     {tunnel, "cat " ++ Filename, " tar " ++ ExtractType ++ " - --strip-components=" ++ Strip ++ " -C "  ++ TargetDirectory};
-cmd(mkdir, Args) ->
+gen_cmd(mkdir, Args) ->
     Dir = proplists:get_value(dir, Args),
     "[ -d " ++ Dir ++ " ] || mkdir -p " ++ Dir;
-cmd(version, Args) ->
+gen_cmd(version, Args) ->
     NodeName = proplists:get_value(node_name, Args),
     ReleaseName = proplists:get_value(release_name, Args),
     BaseDir = proplists:get_value(base_dir, Args),
     File = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
     File ++ " versions";
-cmd(write, Args) ->
+gen_cmd(write, Args) ->
     Source = proplists:get_value(source, Args),
     File = proplists:get_value(file, Args),
     {tunnel, "cat " ++ Source, "cat - >" ++ File};
-cmd(read, Args) ->
+gen_cmd(read, Args) ->
     File = proplists:get_value(file, Args),
     "[ -f " ++ File ++ " ] && cat " ++ File;
-cmd(exists, Args) ->
+gen_cmd(exists, Args) ->
     BaseDir = proplists:get_value(base_dir, Args),
     Dirname = 
         case proplists:get_value(node_name, Args) of
