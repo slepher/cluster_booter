@@ -15,7 +15,7 @@
          format_error/1]).
 
 -define(PROVIDER, versions).
--define(DEPS, [installed, node_status]).
+-define(DEPS, [installed]).
 
 -spec init(cluster_booter_state:t()) -> {ok, cluster_booter_state:t()}.
 init(State) ->
@@ -29,15 +29,17 @@ init(State) ->
 
 do(State) ->
     BaseDir = cluster_booter_state:root(State),
-    StartedNodes = cluster_booter_state:started_nodes(State),
     CurrentHost = cluster_booter_state:current_host(State),
+    Nodes = cluster_booter_state:nodes(State),
+    NodeMap = cluster_booter_state:node_map(State),
+    Status = cluster_booter_node:check(Nodes, NodeMap),
     NodeVersions = 
         cluster_booter_state:fold_host_nodes(
           fun(Host, Release, Node, Acc) ->
                   CmdOpts = [{host, Host}, {current_host, CurrentHost}],
                   case cluster_booter_state:installed(Host, Node, State) of
                       true ->
-                          case lists:member(Node, StartedNodes) of
+                          case cluster_booter_node:started(Node, Status) of
                               true ->
                                   case current_release_version(Node) of
                                       {ok, Version} ->

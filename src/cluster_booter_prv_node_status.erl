@@ -32,27 +32,13 @@ init(State) ->
 do(State) ->
     NodeNames = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
-    NState = cluster_booter_state:clear_node_status(State),
-    NNState = 
-    lists:foldl(
-      fun(NodeName, StateAcc) ->
-              case maps:find(NodeName, NodeMap) of
-                  {ok, Node} ->
-                      case net_adm:ping(Node) of
-                          pong ->
-                              cluster_booter_state:add_started_node(StateAcc, NodeName);
-                          pang ->
-                              cluster_booter_state:add_unstarted_node(StateAcc, NodeName)
-                      end;
-                  error ->
-                      cluster_booter_state:add_undefined_node(StateAcc, NodeName)
-              end
-      end, NState, NodeNames),
-    print_node_status(NNState),
-    UndefinedNodes = cluster_booter_state:undefined_nodes(NNState),
+    NodeStatus = cluster_booter_node:check(NodeNames, NodeMap),
+    cluster_booter_node:print(NodeStatus),
+    UndefinedNodes = cluster_booter_node:undefined_nodes(NodeStatus),
     case UndefinedNodes of
         [] ->
-            {ok, NNState};
+            NState = cluster_booter_state:node_status(State, NodeStatus),
+            {ok, NState};
         _ ->
             {error, {unconfigured_nodes, UndefinedNodes}}
     end.
@@ -72,17 +58,3 @@ format_error({unconfigured_nodes, Nodes}) when is_list(Nodes) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-print_node_status(State) ->
-    StartedNodes = cluster_booter_state:started_nodes(State),
-    UnstartedNodes = cluster_booter_state:unstarted_nodes(State),
-    UndefinedNodes = cluster_booter_state:undefined_nodes(State),
-    print_nodes_with_status(StartedNodes, started),
-    print_nodes_with_status(UnstartedNodes, unstarted),
-    print_nodes_with_status(UndefinedNodes, undefined).
-
-print_nodes_with_status(Nodes, Status) ->
-    lists:foreach(
-      fun(Node) ->
-              io:format("node ~p ~p.~n", [Node, Status])
-      end, Nodes). 

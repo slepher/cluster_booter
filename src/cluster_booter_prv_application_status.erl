@@ -14,7 +14,7 @@
          format_error/1]).
 
 -define(PROVIDER, app_status).
--define(DEPS, [node_status, start_nodes]).
+-define(DEPS, [node_status]).
 
 %%%===================================================================
 %%% API
@@ -30,16 +30,11 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    NodeMap = cluster_booter_state:node_map(State),
-    StartedNodes = cluster_booter_state:started_nodes(State),
-    NodeMainApplications = cluster_booter_state:releases(State),
-    case cluster_booter_application:node_applications(StartedNodes, NodeMap) of
-        {ok, NodeApplications} ->
-            ApplicationSt = cluster_booter_application:application_st(NodeMainApplications, NodeApplications),
-            NState = cluster_booter_state:application_st(State, NodeMainApplications),
-            NNState = cluster_booter_state:main_application_st(NState, ApplicationSt),
+    case cluster_booter_application:check(State) of
+        {ok, NState} ->
+            ApplicationSt = cluster_booter_state:application_st(State),
             print_application_st(ApplicationSt),
-            {ok, NNState};
+            {ok, NState};
         {error, Reason} ->
             {error, Reason}
     end.

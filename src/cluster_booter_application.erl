@@ -9,11 +9,28 @@
 -module(cluster_booter_application).
 
 %% API
+-export([check/1]).
 -export([application_st/2, node_applications/2, boot_application/2, boot_application/3, boot_applications/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+check(State) ->
+    NodeMap = cluster_booter_state:node_map(State),
+    NodeStatus = cluster_booter_state:node_status(State),
+    StartedNodes = cluster_booter_node:started_nodes(NodeStatus),
+    NodeMainApplications = cluster_booter_state:releases(State),
+    case cluster_booter_application:node_applications(StartedNodes, NodeMap) of
+        {ok, NodeApplications} ->
+            ApplicationSt = cluster_booter_application:application_st(NodeMainApplications, NodeApplications),
+            NState = cluster_booter_state:application_st(State, NodeMainApplications),
+            NNState = cluster_booter_state:main_application_st(NState, ApplicationSt),
+            {ok, NNState};
+        {error, Reason} ->
+            {error, Reason}
+    end. 
+
+
 node_applications(Nodes, NodeMap) ->
     {OkNodes, ErrorNodes} = 
         lists:foldl(

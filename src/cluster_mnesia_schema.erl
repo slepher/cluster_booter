@@ -12,7 +12,7 @@
 -export([table_master_node/2]).
 
 -callback(applications() -> #{atom() := [atom()]}).
--callback(tables() -> #{atom() := #{name := atom(), table => atom(), indexes => [atom()]}}).
+-callback(tables() -> #{atom() := [#{name := atom(), fields := [atom()], table => atom(), indexes => [atom()]}]}).
 
 
 tables(NodeNames, NodeMap, Module) ->
@@ -63,7 +63,7 @@ table_nodes(NodeGroups, GroupTables) ->
 
 table_master_node(SchemaMasterNode, Table) ->
     case rpc:call(SchemaMasterNode, mnesia, table_info, [Table, disc_copies]) of
-        [Node|T] ->
+        [Node|_T] ->
             {ok, Node};
         [] ->
             {error, no_table}

@@ -15,7 +15,6 @@
 -export([load_terms/2]).
 -export([initialize/1]).
 -export([get_env/2, get_env/3, get_node/2]).
--export([clear_node_status/1, add_started_node/2, add_unstarted_node/2, add_undefined_node/2]).
 -export([add_provider/2, add_to_provider_hooks/3]).
 -export([cmd_opt/2]).
 -export([fold_host_nodes/3, installed/3]).
@@ -47,9 +46,7 @@
                   nodes = [], 
                   release_nodes_map = maps:new(),
                   node_release_map = maps:new(),
-                  started_nodes = [],
-                  unstarted_nodes = [],
-                  undefined_nodes = [],
+                  node_status,
                   running_processes = [],
                   node_map = maps:new(), 
                   hosts = maps:new(),
@@ -254,18 +251,6 @@ init_provider_hooks(#state_t{providers = Providers, provider_hooks = Hooks} = St
             {error, Reason}
     end.
 
-clear_node_status(#state_t{} = State) ->
-    State#state_t{started_nodes = [], unstarted_nodes = [], undefined_nodes = []}.
-
-add_started_node(#state_t{started_nodes = Nodes} = State, Node) ->
-    State#state_t{started_nodes = [Node|Nodes]}.
-
-add_unstarted_node(#state_t{unstarted_nodes = Nodes} = State, Node) ->
-    State#state_t{unstarted_nodes = [Node|Nodes]}.
-
-add_undefined_node(#state_t{undefined_nodes = Nodes} = State, Node) ->
-    State#state_t{undefined_nodes = [Node|Nodes]}.
-
 fold_host_nodes(Fun, Init, #state_t{hosts = Hosts, node_release_map = NodeReleases}) ->
     maps:fold(
       fun(Host, Nodes, Acc) ->
@@ -293,8 +278,9 @@ installed(Host, Node, #state_t{installed_packages = InstalledPackages}) ->
            unknown
    end.
 
-node_started(NodeName, #state_t{started_nodes = StartedNodes}) ->
-    lists:member(NodeName, StartedNodes).
+node_started(NodeName, #state_t{node_status = NodeStatus}) ->
+    cluster_booter_node:started(NodeName, NodeStatus).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

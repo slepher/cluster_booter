@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, start_nodes).
--define(DEPS, [installed, node_status, config]).
+-define(DEPS, [installed, config]).
 
 %%%===================================================================
 %%% API
@@ -31,11 +31,12 @@ do(State) ->
     BaseDir = cluster_booter_state:root(State),
     Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
+    Status = cluster_booter_node:check(Nodes, NodeMap),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, NodeName, ok) ->
               case cluster_booter_state:installed(Host, Release, State) of
                   true ->
-                      case cluster_booter_state:node_started(NodeName, State) of
+                      case cluster_booter_node:started(NodeName, Status) of
                           false ->
                               CmdOpt = cluster_booter_state:cmd_opt(Host, State),
                               CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, BaseDir}],
@@ -43,14 +44,19 @@ do(State) ->
                               os:cmd(Cmd),
                               io:format("start ~p at ~s~n", [Release, Host]);
                           true ->
-                              io:format("node ~p is already started at ~s~n", [Release, Host])
+                              ok
                       end;
                   false ->
                       io:format("release ~p is not installed at ~s~n", [Release, Host])
               end
       end, ok, State),
-    cluster_booter_node:wait(Nodes, NodeMap, 10000, started),
-    cluster_booter_prv_node_status:do(State).
+    case cluster_booter_node:wait(Status, 10000, started) of
+        {ok, NStatus} ->
+            NState = cluster_booter_state:node_status(State, NStatus),
+            {ok, NState};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 format_error(_Error) ->
     ok.

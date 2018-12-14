@@ -30,25 +30,26 @@ init(State) ->
 do(State) ->
     Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
-    case cluster_booter_prv_node_status:do(State) of
-        {ok, NState} ->
-            cluster_booter_state:fold_host_nodes(
-              fun(Host, Release, NodeName, ok) ->
-                      case cluster_booter_state:node_started(NodeName, NState) of
-                          false ->
-                              io:format("node ~p is already stoppped at ~s~n", [NodeName, Host]);
-                          true ->
-                              Node = maps:get(NodeName, NodeMap),
-                              case cluster_booter:rpc_call(Node, init, stop, []) of
-                                  ok ->
-                                      io:format("node ~p is stopped at ~s~n", [Release, Host]);
-                                  {error, Reason} ->
-                                      io:format("node ~p is stop failed ~p at ~s~n", [Release, Reason, Host])
-                              end
+    Status = cluster_booter_node:check(Nodes, NodeMap),
+    cluster_booter_state:fold_host_nodes(
+      fun(Host, Release, NodeName, ok) ->
+              case cluster_booter_node:started(NodeName, Status) of
+                  false ->
+                      ok;
+                  true ->
+                      Node = maps:get(NodeName, NodeMap),
+                      case cluster_booter:rpc_call(Node, init, stop, []) of
+                          ok ->
+                              io:format("node ~p is stopped at ~s~n", [Release, Host]);
+                          {error, Reason} ->
+                              io:format("node ~p is stop failed ~p at ~s~n", [Release, Reason, Host])
                       end
-              end, ok, NState),
-            cluster_booter_node:wait(Nodes, NodeMap, 10000, stopped),
-            cluster_booter_prv_node_status:do(NState);
+              end
+      end, ok, State),
+    case cluster_booter_node:wait(Status, 10000, stopped) of
+        {ok, NStatus} ->
+            NState = cluster_booter_state:node_status(State, NStatus),
+            {ok, NState};
         {error, Reason} ->
             {error, Reason}
     end.

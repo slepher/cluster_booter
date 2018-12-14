@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, start_apps).
--define(DEPS, [start_nodes, app_status]).
+-define(DEPS, [start_nodes]).
 
 %%%===================================================================
 %%% API
@@ -28,14 +28,19 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    MainApplicationSt = cluster_booter_state:main_application_st(State),
-    NodeMap = cluster_booter_state:node_map(State),
-    MnesiaNodes = lists:flatten(maps:values(cluster_booter_state:mnesia_nodes(State))),
-    case cluster_booter_mnesia:boot_mnesia(MnesiaNodes, NodeMap) of
-        {ok, ok} ->
-            case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
+    case cluster_booter_application:check(State) of
+        {ok, NState} ->
+            MainApplicationSt = cluster_booter_state:main_application_st(NState),
+            NodeMap = cluster_booter_state:node_map(NState),
+            MnesiaNodes = lists:flatten(maps:values(cluster_booter_state:mnesia_nodes(NState))),
+            case cluster_booter_mnesia:boot_mnesia(MnesiaNodes, NodeMap) of
                 {ok, ok} ->
-                    {ok, State};
+                    case cluster_booter_application:boot_applications(MainApplicationSt, NodeMap) of
+                        {ok, ok} ->
+                            {ok, NState};
+                        {error, Reason} ->
+                            {error, Reason}
+                    end;
                 {error, Reason} ->
                     {error, Reason}
             end;
