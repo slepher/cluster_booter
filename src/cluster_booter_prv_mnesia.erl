@@ -28,31 +28,24 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    UnstartedNodes = cluster_booter_state:unstarted_nodes(State),
-    UndefinedNodes = cluster_booter_state:unstarted_nodes(State),
-    case {UnstartedNodes, UndefinedNodes} of
-        {[], []} ->
-            SchemaModule = cluster_booter_state:mnesia_schema(State),
-            MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
-            NodeMap = cluster_booter_state:node_map(State),
-            Result = 
-                maps:fold(
-                  fun(NodeName, MnesiaNodes, Acc) ->
-                          case cluster_booter_mnesia:initialize(MnesiaNodes, NodeMap, SchemaModule) of
-                              ok ->
-                                  Acc;
-                              {error, Reason} ->
-                                  maps:put(NodeName, Reason, Acc)
-                          end
-                  end, maps:new(), MnesiaNodeMap),
-            case maps:size(Result) of
-                0 ->
-                    {ok, State};
-                _ ->
-                    {error, Result}
-            end;
+    SchemaModule = cluster_booter_state:mnesia_schema(State),
+    MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
+    NodeMap = cluster_booter_state:node_map(State),
+    Result = 
+        maps:fold(
+          fun(NodeName, MnesiaNodes, Acc) ->
+                  case cluster_booter_mnesia:initialize(MnesiaNodes, NodeMap, SchemaModule) of
+                      ok ->
+                          Acc;
+                      {error, Reason} ->
+                          maps:put(NodeName, Reason, Acc)
+                  end
+          end, maps:new(), MnesiaNodeMap),
+    case maps:size(Result) of
+        0 ->
+            {ok, State};
         _ ->
-            {error, {nodes_unready, UnstartedNodes ++ UndefinedNodes}}
+            {error, Result}
     end.
 
 format_error({nodes_unready, Nodes}) when is_list(Nodes) ->
