@@ -29,6 +29,7 @@ do(State) ->
     CurrentHost = cluster_booter_state:current_host(State),
     SysConfig = cluster_booter_state:sys_config(State),
     VMArgs = cluster_booter_state:vm_args(State),
+    EnvFile = cluster_booter_state:erl_env(State),
     NodeVersions = cluster_booter_state:node_versions(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, Node, Acc) ->
@@ -37,12 +38,16 @@ do(State) ->
                   {ok, Version} ->
                       SysConfigTemplate = bbmustache:parse_file(SysConfig),
                       VMArgsTemplate = bbmustache:parse_file(VMArgs),
+                      EnvTemplate = bbmustache:parse_file(EnvFile),
                       FVariables = update_node_variables(Release, Node, State),
                       SysConfigResult = bbmustache:compile(SysConfigTemplate, FVariables),
                       VMArgResult = bbmustache:compile(VMArgsTemplate, FVariables),
+                      EnvResult = bbmustache:compile(EnvTemplate, FVariables),
                       Dir = filename:join([BaseDir, Node, "releases", Version]),
                       write_file(Dir, "sys.config", SysConfigResult, CmdOpts),
                       write_file(Dir, "vm.args", VMArgResult, CmdOpts),
+                      write_file(filename:join([BaseDir, Node, "bin"]), "erl.env", EnvResult, CmdOpts),
+                      chmod(filename:join([BaseDir, Node, "bin", "erl.env"]), CmdOpts),
                       Acc;
                   error ->
                       io:format("get version of ~p failed~n", [Node]),
@@ -60,7 +65,7 @@ update_node_variables(Release, NodeName, State) ->
     Root = cluster_booter_state:root(State),
     MnesiaDir = cluster_booter_state:mnesia_dir(State),
     LogDir = cluster_booter_state:log_dir(State),
-
+    PipeDir = cluster_booter_state:pipe_dir(State),
     Cookie = cluster_booter_state:cookie(State),
     NodeMap = cluster_booter_state:node_map(State),
     Variables = cluster_booter_state:variables(State),
@@ -70,7 +75,7 @@ update_node_variables(Release, NodeName, State) ->
     Node = maps:get(NodeName, NodeMap),
     NodeInfo = #{IsNode => true, IsRelease => true, node_name => NodeName,
                  node => Node, release_name => Release, cookie => Cookie, root => Root,
-                 mnesia_dir => MnesiaDir, log_dir => LogDir},
+                 mnesia_dir => MnesiaDir, log_dir => LogDir, pipe_dir => PipeDir},
     NodeVariables = maps:get(Node, NodeVariablesMap, maps:new()),
     ReleaseVariables = maps:get(Release, NodeVariablesMap, maps:new()),
     VariableMap = 
@@ -91,4 +96,7 @@ write_file(Dir, Name, Data, CmdOpts) ->
     os:cmd(Cmd),
     file:delete(TempFile).
 
+chmod(File, CmdOpts) ->
+    Cmd = cluster_booter_cmd:cmd("chmod +x " ++ File, CmdOpts),
+    os:cmd(Cmd).
     

@@ -32,6 +32,7 @@
                   packages_path = ".",
                   mnesia_dir = ".",
                   log_dir = ".",
+                  pipe_dir = ".",
                   packages = maps:new(),
                   installed_packages = maps:new(),
                   node_versions = maps:new(),
@@ -41,6 +42,7 @@
                   node_variables = maps:new(),
                   sys_config,
                   vm_args,
+                  erl_env,
                   node_name,
                   cookie,
                   nodes = [], 
@@ -200,11 +202,17 @@ load_term({sys_config, SysConfig}, State) ->
 load_term({vm_args, VmArgs}, State) ->
     NState = vm_args(State, VmArgs),
     {ok, NState};
+load_term({erl_env, ErlEnv}, State) ->
+    NState = erl_env(State, ErlEnv),
+    {ok, NState};
 load_term({log_dir, LogDir}, State) ->
     NState = log_dir(State, LogDir),
     {ok, NState};
 load_term({mnesia_dir, MnesiaDir}, State) ->
     NState = mnesia_dir(State, MnesiaDir),
+    {ok, NState};
+load_term({pipe_dir, PipeDir}, State) ->
+    NState = pipe_dir(State, PipeDir),
     {ok, NState};
 load_term(_Term, State) ->
     {ok, State}.

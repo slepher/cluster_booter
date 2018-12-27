@@ -30,6 +30,7 @@ do(State) ->
     Root = cluster_booter_state:root(State),
     MnesiaDir = cluster_booter_state:mnesia_dir(State),
     LogDir = cluster_booter_state:log_dir(State),
+    PipeDir = cluster_booter_state:pipe_dir(State),
     CurrentHost = cluster_booter_state:current_host(State),
     HostInstalledPackages = cluster_booter_state:installed_packages(State),
     Packages = cluster_booter_state:packages(State),
@@ -51,26 +52,28 @@ do(State) ->
               Opts = [{host, Host}, {current_host, CurrentHost}],
               mkdir(filename:join(Root, MnesiaDir), Opts),
               mkdir(filename:join(Root, LogDir), Opts),
+              mkdir(filename:join(Root, PipeDir), Opts),
               InstalledPackages = maps:get(Host, HostInstalledPackages, maps:new()),
               lists:foreach(
-                fun(Node) ->
-                        Installed = maps:get(Node, InstalledPackages, false),
+                fun(NodeName) ->
+                        mkdir(filename:join(Root, PipeDir), Opts),
+                        Installed = maps:get(NodeName, InstalledPackages, false),
                         case Installed of
                             false ->
-                                case maps:find(Node, NodeReleaseMap) of
+                                case maps:find(NodeName, NodeReleaseMap) of
                                     {ok, Release} ->
                                         case get_latest_version(Release, Packages) of
                                             {ok, Version} ->
-                                                CmdResult = Fun(Host, Node, Release, Version),
-                                                io:format("install ~p success ~s~n", [Node, CmdResult]);
+                                                CmdResult = Fun(Host, NodeName, Release, Version),
+                                                io:format("install ~p success ~s~n", [NodeName, CmdResult]);
                                             {error, Reason} ->
                                                 io:format("~p of ~p~n", [Reason, Release])
                                         end;
                                     error ->
-                                        io:format("no_release of ~p~n", [Node])
+                                        io:format("no_release of ~p~n", [NodeName])
                                 end;
                             true ->
-                                io:format("~p is already installed~n", [Node])
+                                io:format("~p is already installed~n", [NodeName])
                         end
                 end, Nodes)
       end, ok, Hosts),
