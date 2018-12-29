@@ -41,6 +41,7 @@ do(State) ->
                               CmdOpt = cluster_booter_state:cmd_opt(Host, State),
                               CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, BaseDir}],
                               Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
+                              io:format("cmd is ~s~n", [Cmd]),
                               os:cmd(Cmd),
                               io:format("start ~p at ~s~n", [Release, Host]);
                           true ->
