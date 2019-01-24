@@ -72,8 +72,8 @@ init([]) ->
                          {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
                          {stop, Reason :: term(), NewState :: term()}.
 handle_call(initialize, _From, State) ->
-    Clusters = application:get_env(clusters),
-    Nodes = application:get_env(nodes),
+    _Clusters = application:get_env(clusters),
+    _Nodes = application:get_env(nodes),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------

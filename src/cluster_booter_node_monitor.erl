@@ -70,7 +70,7 @@ init([NodeMap]) ->
                          {noreply, NewState :: term(), hibernate} |
                          {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
                          {stop, Reason :: term(), NewState :: term()}.
-handle_call({wait_nodes, Nodes, Status, Timeout}, _From, #state{node_map = NodeMap} = State) ->
+handle_call({wait_nodes, Nodes, _Status, _Timeout}, _From, #state{node_map = NodeMap} = State) ->
     case validate_nodes_defined(Nodes, NodeMap) of
         [] ->
             {reply, ok, State};

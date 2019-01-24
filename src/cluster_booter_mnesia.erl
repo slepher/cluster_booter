@@ -8,8 +8,9 @@
 %%%-------------------------------------------------------------------
 -module(cluster_booter_mnesia).
 
--compile({parse_transform, ast_macro}).
--import_macro({rpc_function, transform, []}).
+-include_lib("astranaut/include/macro.hrl").
+
+-use_macro({rpc_function, transform/1, [{group_args, true}]}).
 
 %% API
 -export([validate_mnesia_clusters/2, validate_mnesia_cluster/2]).
