@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(rpc_function).
 
--compile({parse_transform, ast_quote}).
+-include_lib("astranaut/include/quote.hrl").
 
 %% API
 -export([transform/1, rpc_function/2]).
@@ -18,7 +18,7 @@
 %%%===================================================================
 transform([Function|Bindings]) ->
     AtomVarBindings = atom_var_bindings(Bindings, 0),
-    FunctionAst = ast_quote:quote(Function, 0),
+    FunctionAst = astranaut_quote:quote(Function, 0),
     quote(?MODULE:rpc_function(unquote(FunctionAst), unquote(AtomVarBindings))).
 
 rpc_function(FunctionAst, AtomVarBindings) ->

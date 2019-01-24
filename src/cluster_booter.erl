@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(cluster_booter).
 
--compile({parse_transform, do}).
+-include_lib("erlando/include/do.hrl").
 
 %% API
 -export([rpc_call/4, return_mnesia_rpc/2]).
