@@ -6,7 +6,7 @@
   {id, "cluster_booter"},
   {modules,      []},
   {registered,   []},
-  {applications, [kernel, stdlib, sasl, ast_traverse, getopt, providers, erlando]},
+  {applications, [kernel, stdlib, sasl, getopt, providers, erlando]},
   {env,  [{nodes, []}]}
  ]
 }.
