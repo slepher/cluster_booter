@@ -18,7 +18,7 @@
 %%% API
 %%%===================================================================
 parse_transform(Forms, _Options) ->
-    Opts = [{attrs, []}, {alias, mnesia_schema}, group_args],
+    Opts = [{attrs, []}, {alias, mnesia_schema}, group_args, debug],
     astranaut_macro:transform_macro(?MODULE, mnesia_schema, 2, Opts, Forms).
 
 format_error(Message) ->
@@ -38,7 +38,7 @@ format_error(Message) ->
 %%%===================================================================
 mnesia_schema(Tables, #{line := Line}) ->
     NNode = lists:map(fun update_table/1, Tables),
-    quote(tuple_to_list({unquote_splicing(NNode)}), Line).
+    quote([unquote_splicing(NNode)], Line).
 
 %list_node([Node], Line) ->
 %    {cons, Line, Node, {nil, Line}};
