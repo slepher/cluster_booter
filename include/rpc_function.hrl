@@ -1,0 +1,5 @@
+-include_lib("astranaut/include/macro.hrl").
+-ifndef(CLUSTER_BOOTER_RPC_FUNCTION).
+-define(CLUSTER_BOOTER_RPC_FUNCTION, true).
+-use_macro({rpc_function, transform/1, [group_args]}).
+-endif.
