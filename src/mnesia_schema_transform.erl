@@ -18,7 +18,7 @@
 %%% API
 %%%===================================================================
 parse_transform(Forms, _Options) ->
-    Opts = [{attrs, []}, {alias, mnesia_schema}, group_args, debug],
+    Opts = [{attrs, []}, {alias, mnesia_schema}, group_args],
     astranaut_macro:transform_macro(?MODULE, mnesia_schema, 2, Opts, Forms).
 
 format_error(Message) ->
