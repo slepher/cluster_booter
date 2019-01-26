@@ -10,7 +10,7 @@
 
 %% API
 -export([parse_transform/2, format_error/1]).
--export([mnesia_schema/2]).
+-export([mnesia_schema/1]).
 
 -include_lib("astranaut/include/quote.hrl").
 
@@ -18,8 +18,8 @@
 %%% API
 %%%===================================================================
 parse_transform(Forms, _Options) ->
-    Opts = [{attrs, []}, {alias, mnesia_schema}, group_args],
-    astranaut_macro:transform_macro(?MODULE, mnesia_schema, 2, Opts, Forms).
+    Opts = [{alias, mnesia_schema}, group_args],
+    astranaut_macro:transform_macro(?MODULE, mnesia_schema, 1, Opts, Forms).
 
 format_error(Message) ->
     case io_lib:deep_char_list(Message) of
@@ -36,9 +36,9 @@ format_error(Message) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-mnesia_schema(Tables, #{line := Line}) ->
+mnesia_schema(Tables) ->
     NNode = lists:map(fun update_table/1, Tables),
-    quote([unquote_splicing(NNode)], Line).
+    quote([unquote_splicing(NNode)]).
 
 %list_node([Node], Line) ->
 %    {cons, Line, Node, {nil, Line}};
