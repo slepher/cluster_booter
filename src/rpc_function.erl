@@ -18,8 +18,11 @@
 %%%===================================================================
 transform([Function|Bindings]) ->
     AtomVarBindings = atom_var_bindings(Bindings, 0),
-    FunctionAst = astranaut_quote:quote(Function, 0),
-    quote(?MODULE:rpc_function(unquote(FunctionAst), unquote(AtomVarBindings))).
+    Quoted = astranaut_quote:quote(Function),
+    astranaut_traverse:map_traverse_return(
+      fun(Quoted1) ->
+              quote(?MODULE:rpc_function(unquote(Quoted1), unquote(AtomVarBindings)))
+      end, Quoted).
 
 rpc_function(FunctionAst, AtomVarBindings) ->
     BindingValues = 

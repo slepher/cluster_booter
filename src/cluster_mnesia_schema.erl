@@ -43,17 +43,12 @@ table_nodes(NodeGroups, GroupTables) ->
                                 lists:foldl(
                                   fun(Table, Acc2) ->
                                           #{name := Name} = Table,
-                                          TableNodes = 
-                                              case maps:find(Name, Acc2) of
-                                                  {ok, #{nodes := Value}} ->
-                                                      Value;
-                                                  error ->
-                                                      []
-                                              end,
                                           TableName = maps:get(table, Table, Name),
-                                          NTable = maps:put(table, TableName, Table),
-                                          NNTable = maps:put(nodes, ordsets:add_element(Node, TableNodes), NTable),
-                                          maps:put(TableName, NNTable, Acc2)
+                                          AccTable = maps:get(TableName, Acc2, #{}),
+                                          TableNodes = maps:get(nodes, AccTable, []),
+                                          NTableNodes = ordsets:add_element(Node, TableNodes),
+                                          NAccTable = maps:merge(Table, AccTable#{table => TableName, nodes => NTableNodes}),
+                                          maps:put(TableName, NAccTable, Acc2)
                                   end, Acc1, Tables);
                             error ->
                                 exit({group_not_exits, Group})

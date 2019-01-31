@@ -95,7 +95,7 @@ initialize(NodeNames, NodeMap, Module) ->
                             ok;
                         _ ->
                             {error, {create_table_failed, CreateTableFails}}
-            end;               
+                    end;
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -189,7 +189,6 @@ create_table(MasterNode, #{table := TableName, fields := Fields, nodes := Nodes,
             {error, Reason}
     end.
     
-
 init_datas(MasterNode, Table, Datas) ->
     case Datas of
         [] ->
