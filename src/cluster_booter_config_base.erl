@@ -44,16 +44,10 @@ config(CmdTerms, ConfigFile) ->
             {ok, merge_configs(CmdTerms, ConfigTerms)}
     end.
 
-config_from_file(CmdTerms, ConfigFile) ->
+config_from_file(_CmdTerms, ConfigFile) ->
     Config0 = case filelib:is_regular(ConfigFile) of
                   true ->
-                      VariableFile = variable_file(CmdTerms, ConfigFile),
-                      case variables(VariableFile) of
-                          {ok, Variables} ->
-                              consult_with_variables(Variables, ConfigFile);
-                          {error, Reason} ->
-                              {error, Reason}
-                      end;
+                      consult_file(ConfigFile);
                   false -> 
                       {error, no_exists}
               end,
@@ -69,13 +63,24 @@ config_from_file(CmdTerms, ConfigFile) ->
             end
     end.
 
-consult_with_variables([], ConfigFile) ->
+consult_file(ConfigFile) ->
     case file:consult(ConfigFile) of
         {error, Reason} ->
             {error, {consult, ConfigFile, Reason}};
-        {ok, Terms} -> 
-            {ok, Terms}
-    end;
+        {ok, Terms} ->
+            case proplists:get_value(variable_file, Terms) of
+                undefined ->
+                    {ok, Terms};
+                VarFile ->
+                    case variables(VarFile) of
+                        {ok, Variables} ->
+                            consult_with_variables(Variables, ConfigFile);
+                        {error, Reason} ->
+                            {error, Reason}
+                    end
+            end
+    end.
+
 consult_with_variables(Variables, ConfigFile) ->
     NVariables = lists:map(fun({K, V}) -> {atom_to_list(K), V} end, Variables),
     ConfigTemplate = bbmustache:parse_file(ConfigFile),
@@ -83,9 +88,6 @@ consult_with_variables(Variables, ConfigFile) ->
     Configs = cluster_booter_terms:scan_binary(ConfigString),
     {ok, Configs}.
 
-variable_file(_CmdTerms, ConfigFile) ->
-    ConfigFile ++ ".vars".
-    
 variables(ConfigVariableFile) ->
     case filelib:is_regular(ConfigVariableFile) of
         true ->
@@ -96,7 +98,7 @@ variables(ConfigVariableFile) ->
                     {ok, Terms}
             end;
         false ->
-            {ok, []}
+            {error, {no_variable_file, ConfigVariableFile}}
     end.
 
 merge_configs([], ConfigTerms) ->
