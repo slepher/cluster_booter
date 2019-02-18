@@ -13,6 +13,7 @@
 %% API
 -export([rpc_call/4, return_mnesia_rpc/2]).
 -export([main/1, main/2, format_error/1]).
+-export([init_state/1]).
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -27,29 +28,40 @@ main(Args, Opts) ->
             format_error(Detail)
     end.
 
-do(Options, NonOptions) ->
+init_state(Options) ->
     State = cluster_booter_state:new(),
     DefaultConfig = cluster_booter_config_base:default_config(Options),
     ConfigFile = cluster_booter_config_base:config_file(Options, config, "booter.config"),
-    Result = 
-        do([error_m ||
-               Config <- cluster_booter_config_base:config(Options, ConfigFile),
-               NConfig = cluster_booter_config_base:merge_configs(Config, DefaultConfig),
-               NState <- cluster_booter_state:load_terms(NConfig, State),
-               cluster_booter_state:validate(NState),
-               NNState <- cluster_booter_state:initialize(NState),
-               set_node_name_and_cookie(NNState),
-               AllProviders = cluster_booter_state:providers(NNState),
-               case lists:member(help, Options) or (NonOptions == []) of
-                   true ->
-                       usage(AllProviders);
-                   false ->
-                       [Command|_] = NonOptions,
-                       Actions = [list_to_atom(Command)],
-                       cluster_booter_providers:run(Actions, AllProviders, NNState)
-               end
-           ]),
-    handle_output(State, command_line, Result).
+    do([error_m ||
+           Config <- cluster_booter_config_base:config(Options, ConfigFile),
+           NConfig = cluster_booter_config_base:merge_configs(Config, DefaultConfig),
+           State1 <- cluster_booter_state:load_terms(NConfig, State),
+           State2 <- cluster_booter_state:transform(State1),
+           cluster_booter_state:validate(State2),
+           cluster_booter_state:initialize(State2)
+       ]).
+
+do(Options, NonOptions) ->
+    case init_state(Options) of
+        {ok, State} ->
+            Result = 
+                do([error_m ||
+                       set_node_name_and_cookie(State),
+                       AllProviders = cluster_booter_state:providers(State),
+                       case lists:member(help, Options) or (NonOptions == []) of
+                           true ->
+                               usage(AllProviders);
+                           false ->
+                               [Command|_] = NonOptions,
+                               Actions = [list_to_atom(Command)],
+                               cluster_booter_providers:run(Actions, AllProviders, State)
+                       end
+                   ]),
+            handle_output(State, command_line, Result);
+        {error, Reason} ->
+            handle_output(no_state, command_line, {error, Reason})
+    end.
+
 
 set_node_name_and_cookie(State) ->
     NodeName = cluster_booter_state:node_name(State),

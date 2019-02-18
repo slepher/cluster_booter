@@ -10,7 +10,7 @@
 
 %% API
 -export([new/0]).
--export([validate/1]).
+-export([validate/1, transform/1]).
 -export([create_all_providers/2]).
 -export([load_terms/2]).
 -export([initialize/1]).
@@ -39,6 +39,7 @@
                   root,
                   env = [],
                   variables = maps:new(),
+                  variable_opts = [],
                   node_variables = maps:new(),
                   sys_config,
                   vm_args,
@@ -68,6 +69,17 @@
 %%%===================================================================
 new() ->
     #state_t{}.
+
+transform(State) ->
+    transform_variables(State).
+    
+transform_variables(State) ->
+    Variables = variables(State),
+    Env = env(State),
+    VariableOpts = cluster_booter_state:variable_opts(State),
+    Variables1 = cluster_booter_variable_generator:variables(Env, VariableOpts),
+    Variables2 = maps:merge(Variables1, Variables),
+    {ok, variables(State, Variables2)}.
 
 validate(_State) ->
     ok.
@@ -187,6 +199,9 @@ load_term({env, Env}, State) ->
 load_term({variables, Variables}, State) ->
     NVariables = maps:from_list(Variables),
     NState = variables(State, NVariables),
+    {ok, NState};
+load_term({variable_opts, Opts}, State) ->
+    NState = variable_opts(State, Opts),
     {ok, NState};
 load_term({node_variables, NodeVariables}, State) ->
     NNodeVariables = 
