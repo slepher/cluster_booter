@@ -16,6 +16,11 @@
 -define(PROVIDER, installed).
 -define(DEPS, []).
 
+
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 -spec init(cluster_booter_state:t()) -> {ok, cluster_booter_state:t()}.
 init(State) ->
     Provider = providers:create([{name, ?PROVIDER},
@@ -27,6 +32,7 @@ init(State) ->
     {ok, NState}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
     Root = cluster_booter_state:root(State),
     Hosts = cluster_booter_state:hosts(State),
     CurrentHost = cluster_booter_state:current_host(State),
@@ -37,7 +43,14 @@ do(State) ->
                   HostSt = 
                       lists:foldl(
                         fun(Node, Acc1) ->
-                                Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, Root}, {node_name, Node}], Opts),
+                                NodeDir = 
+                                    case AllInOne of
+                                        false ->
+                                            filename:join([Root]);
+                                        _ ->
+                                            filename:join([Root, "clients"])
+                                    end,
+                                Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, NodeDir}, {node_name, Node}], Opts),
                                 Value = os:cmd(Cmd),
                                 case Value of
                                     "ok\n" ->
@@ -54,10 +67,6 @@ do(State) ->
     
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
-
-%%%===================================================================
-%%% API
-%%%===================================================================
 
 %%--------------------------------------------------------------------
 %% @doc

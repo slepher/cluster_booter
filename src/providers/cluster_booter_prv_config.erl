@@ -25,6 +25,7 @@ init(State) ->
     {ok, NState}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
     BaseDir = cluster_booter_state:root(State),
     CurrentHost = cluster_booter_state:current_host(State),
     SysConfig = cluster_booter_state:sys_config(State),
@@ -43,11 +44,19 @@ do(State) ->
                       SysConfigResult = bbmustache:compile(SysConfigTemplate, FVariables),
                       VMArgResult = bbmustache:compile(VMArgsTemplate, FVariables),
                       EnvResult = bbmustache:compile(EnvTemplate, FVariables),
-                      Dir = filename:join([BaseDir, Node, "releases", Version]),
+
+                      BaseDir1 = 
+                          case AllInOne of
+                              false ->
+                                  BaseDir;
+                              AllInOne ->
+                                  filename:join([BaseDir, "clients"])
+                          end,
+                      Dir = filename:join([BaseDir1, Node, "releases", Version]),
                       write_file(Dir, "sys.config", SysConfigResult, CmdOpts),
                       write_file(Dir, "vm.args", VMArgResult, CmdOpts),
-                      write_file(filename:join([BaseDir, Node, "bin"]), "erl.env", EnvResult, CmdOpts),
-                      chmod(filename:join([BaseDir, Node, "bin", "erl.env"]), CmdOpts),
+                      write_file(filename:join([BaseDir1, Node, "bin"]), "erl.env", EnvResult, CmdOpts),
+                      chmod(filename:join([BaseDir1, Node, "bin", "erl.env"]), CmdOpts),
                       Acc;
                   error ->
                       io:format("get version of ~p failed~n", [Node]),

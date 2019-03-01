@@ -28,6 +28,7 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
     BaseDir = cluster_booter_state:root(State),
     Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
@@ -39,7 +40,14 @@ do(State) ->
                       case cluster_booter_node:started(NodeName, Status) of
                           false ->
                               CmdOpt = cluster_booter_state:cmd_opt(Host, State),
-                              CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, BaseDir}],
+                              ClientDir = 
+                                  case AllInOne of
+                                      false ->
+                                          BaseDir;
+                                      _AllInOne ->
+                                          filename:join([BaseDir, "clients"])
+                                  end,
+                              CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, ClientDir}],
                               Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
                               io:format("cmd is ~s~n", [Cmd]),
                               os:cmd(Cmd),

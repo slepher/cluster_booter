@@ -27,6 +27,40 @@ init(State) ->
     {ok, NState}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
+    do_packages(AllInOne, State).
+
+format_error(Reason) ->
+    io_lib:format("~p", [Reason]).
+
+%%%===================================================================
+%%% API
+%%%===================================================================
+mkdir(Path, Opts) ->
+    DirArgs = [{dir, Path}],
+    DirCmd = cluster_booter_cmd:cmd(mkdir, DirArgs, Opts),
+    os:cmd(DirCmd).
+
+get_latest_version(Release, Packages) ->
+    case maps:find(Release, Packages) of
+        {ok, VersionsMap} ->
+            Versions = maps:keys(VersionsMap),
+            Version = lists:max(Versions),
+            {ok, Version};
+        error ->
+            {error, no_usabe_packages}
+    end.
+            
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+do_packages(AllInOne, State) ->
     Root = cluster_booter_state:root(State),
     MnesiaDir = cluster_booter_state:mnesia_dir(State),
     LogDir = cluster_booter_state:log_dir(State),
@@ -44,7 +78,6 @@ do(State) ->
                   TargetDirectory = filename:join(Root, Node),
                   Args = [{filename, Filename}, {target_directory, TargetDirectory}],
                   Cmd = cluster_booter_cmd:cmd(extract, Args, Opts),
-                  io:format("cmd is ~s~n", [Cmd]),
                   os:cmd(Cmd)
           end,
     maps:fold(
@@ -79,33 +112,44 @@ do(State) ->
       end, ok, Hosts),
     cluster_booter_prv_installed_packages:do(State).
 
-format_error(Reason) ->
-    io_lib:format("~p", [Reason]).
+%% do_all_in_one(AllInOne, State) ->
+%%     Hosts = cluster_booter_state:hosts(State),
+%%     CurrentHost = cluster_booter_state:current_host(State),
+%%     Root = cluster_booter_state:root(State),
+%%     Packages = cluster_booter_state:packages(State),
+%%     PackagesPath = cluster_booter_state:packages_path(State),
 
-%%%===================================================================
-%%% API
-%%%===================================================================
-mkdir(Path, Opts) ->
-    DirArgs = [{dir, Path}],
-    DirCmd = cluster_booter_cmd:cmd(mkdir, DirArgs, Opts),
-    os:cmd(DirCmd).
-
-get_latest_version(Release, Packages) ->
-    case maps:find(Release, Packages) of
-        {ok, VersionsMap} ->
-            Versions = maps:keys(VersionsMap),
-            Version = lists:max(Versions),
-            {ok, Version};
-        error ->
-            {error, no_usabe_packages}
-    end.
+%%     %case get_latest_version(Release, Packages) of
+%%     %    {ok, Version} ->
+%%     %        File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ Version ++ ".tar.gz"]),
             
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
+%%     maps:fold(
+%%       fun(Host, Nodes, ok) ->
+%%               Opts = [{host, Host}, {current_host, CurrentHost}],
+%%               case cluster_booter_cmd:cmd(exists, [{base_dir, Root}], Opts) of
+%%                   true ->
+%%                       ok;
+%%                   false ->
+%%                       sync_root_dir(Root, Opts)
+%%               end,
+%%               lists:foldl(
+%%                 fun(Node, ok) ->
+%%                         ClientDir = filename:join([Root, "clients", Node]),
+%%                         case cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts) of
+%%                             true ->
+%%                                 ok;
+%%                             false ->
+%%                                 sync_client_dir(Root, Node, Opts),
+%%                                 ok
+%%                         end
+%%                 end, ok, Nodes)
+%%       end, ok, Hosts).
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+sync_root_dir(Root, Options) ->
+    RsyncOptions = "-e clients",
+    cluster_booter_cmd:cmd({rsync, ".", Root, RsyncOptions}, Options).
+
+sync_client_dir(Root, Node, Options) ->
+    From = filename:join(["clients", Node]),
+    To = filename:join([Root, "clients", Node]),
+    cluster_booter_cmd:cmd({rsync, From, To, ""}, Options).

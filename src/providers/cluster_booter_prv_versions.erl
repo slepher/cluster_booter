@@ -28,6 +28,7 @@ init(State) ->
     {ok, NState}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
     BaseDir = cluster_booter_state:root(State),
     CurrentHost = cluster_booter_state:current_host(State),
     Nodes = cluster_booter_state:nodes(State),
@@ -45,10 +46,10 @@ do(State) ->
                                       {ok, Version} ->
                                           maps:put(Node, Version, Acc);
                                       {error, _Reason} ->
-                                          parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc)
+                                          parse_release_file_acc(AllInOne, BaseDir, Host, Node, Release, CmdOpts, Acc)
                                   end;
                               false ->
-                                  parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc)
+                                  parse_release_file_acc(AllInOne, BaseDir, Host, Node, Release, CmdOpts, Acc)
                           end;
                       _ ->
                           Acc
@@ -92,8 +93,8 @@ format_node_versions(NodeVersions) ->
               io:format("version of ~p is ~p~n", [Node, Version])
       end, ok, NodeVersions).
 
-parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc) ->
-    case parse_release_file(BaseDir, Node, Release, CmdOpts) of
+parse_release_file_acc(AllInOne, BaseDir, Host, Node, Release, CmdOpts, Acc) ->
+    case parse_release_file(AllInOne, BaseDir, Node, Release, CmdOpts) of
         {ok, Version} ->
             maps:put(Node, Version, Acc);
         {error, Reason} ->
@@ -101,8 +102,14 @@ parse_release_file_acc(BaseDir, Host, Node, Release, CmdOpts, Acc) ->
             Acc
     end.
 
-parse_release_file(BaseDir, Node, _Release, CmdOpts) ->
-    Filename = filename:join([BaseDir, Node, "releases/RELEASES"]), 
+parse_release_file(AllInOne, BaseDir, Node, _Release, CmdOpts) ->
+    Filename =
+        case AllInOne of
+            false ->
+                filename:join([BaseDir, Node, "releases/RELEASES"]);
+            AllInOne ->
+                filename:join([BaseDir, "clients", Node, "releases/RELEASES"])
+        end,
     Cmd = cluster_booter_cmd:cmd(read, [{file, Filename}], CmdOpts),
     case os:cmd(Cmd) of
         [] ->

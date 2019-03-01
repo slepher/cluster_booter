@@ -38,19 +38,23 @@ host_cmd(Host, CurrentHost, Cmd) ->
     IsLocalhost = localhost(Host, CurrentHost),
     case IsLocalhost of
         true ->
-            tunnel_cmd(Cmd);
+            local_cmd(Cmd);
         false ->
-            ssh_cmd(Host, Cmd)
+            remote_cmd(Host, Cmd)
     end.
 
-tunnel_cmd({tunnel, Before, Cmd}) ->
+local_cmd({rsync, From, To, Options}) ->
+    lists:flatten(io_lib:format("rsync -av ~s ~s ~s", [Options, From, To]));
+local_cmd({tunnel, Before, Cmd}) ->
     Before ++ " | " ++ Cmd;
-tunnel_cmd(Cmd) when is_list(Cmd) ->
+local_cmd(Cmd) when is_list(Cmd) ->
     Cmd.
 
-ssh_cmd(Host, {tunnel, Before, Cmd}) ->
-    tunnel_cmd({tunnel, Before, ssh_cmd(Host, Cmd)});
-ssh_cmd(Host, Cmd) when is_list(Cmd) ->
+remote_cmd(Host, {rsync, From, To, Options}) ->
+    lists:flatten(io_lib:format("rsync -av ~s ~s ~s:~s", [Options, From, Host, To]));
+remote_cmd(Host, {tunnel, Before, Cmd}) ->
+    local_cmd({tunnel, Before, remote_cmd(Host, Cmd)});
+remote_cmd(Host, Cmd) when is_list(Cmd) ->
     lists:flatten("ssh " ++ Host ++ " \"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
 
 gen_cmd(processes, _) ->
