@@ -28,7 +28,19 @@ init(State) ->
 
 do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
-    do_packages(AllInOne, State).
+    Result =  
+        case AllInOne of
+            false ->
+                do_packages(State);
+            AllInOne ->
+                do_all_in_one(AllInOne, State)
+        end,
+    case Result of
+        ok ->
+            cluster_booter_prv_installed_packages:do(State);
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
@@ -60,7 +72,7 @@ get_latest_version(Release, Packages) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-do_packages(AllInOne, State) ->
+do_packages(State) ->
     Root = cluster_booter_state:root(State),
     MnesiaDir = cluster_booter_state:mnesia_dir(State),
     LogDir = cluster_booter_state:log_dir(State),
@@ -109,47 +121,107 @@ do_packages(AllInOne, State) ->
                                 io:format("~p is already installed~n", [NodeName])
                         end
                 end, Nodes)
-      end, ok, Hosts),
-    cluster_booter_prv_installed_packages:do(State).
+      end, ok, Hosts).
 
-%% do_all_in_one(AllInOne, State) ->
-%%     Hosts = cluster_booter_state:hosts(State),
-%%     CurrentHost = cluster_booter_state:current_host(State),
-%%     Root = cluster_booter_state:root(State),
-%%     Packages = cluster_booter_state:packages(State),
-%%     PackagesPath = cluster_booter_state:packages_path(State),
+do_all_in_one(AllInOne, State) ->
+    Hosts = cluster_booter_state:hosts(State),
+    CurrentHost = cluster_booter_state:current_host(State),
+    Root = cluster_booter_state:root(State),
+    Packages = cluster_booter_state:packages(State),
+    PackagesPath = cluster_booter_state:packages_path(State),
+    Result = 
+        maps:fold(
+          fun(Host, Nodes, ok) ->
+                  Opts = [{host, Host}, {current_host, CurrentHost}],
+                  case sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) of
+                      ok ->
+                          lists:foldl(
+                            fun(Node, ok) ->
+                                    sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne);
+                               (_Node, {error, Reason}) ->
+                                    {error, Reason}
+                            end, ok, Nodes);
+                      {error, Reason} ->
+                          {error, Reason}
+                  end;
+             (_Host, _Nodes, {error, Reason}) ->
+                  {error, Reason}
+          end, ok, Hosts),
+    os:cmd(lists:flatten(io_lib:format("rm -rf ~s", [filename:join([PackagesPath, AllInOne])]))),
+    Result.
 
-%%     %case get_latest_version(Release, Packages) of
-%%     %    {ok, Version} ->
-%%     %        File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ Version ++ ".tar.gz"]),
-            
-%%     maps:fold(
-%%       fun(Host, Nodes, ok) ->
-%%               Opts = [{host, Host}, {current_host, CurrentHost}],
-%%               case cluster_booter_cmd:cmd(exists, [{base_dir, Root}], Opts) of
-%%                   true ->
-%%                       ok;
-%%                   false ->
-%%                       sync_root_dir(Root, Opts)
-%%               end,
-%%               lists:foldl(
-%%                 fun(Node, ok) ->
-%%                         ClientDir = filename:join([Root, "clients", Node]),
-%%                         case cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts) of
-%%                             true ->
-%%                                 ok;
-%%                             false ->
-%%                                 sync_client_dir(Root, Node, Opts),
-%%                                 ok
-%%                         end
-%%                 end, ok, Nodes)
-%%       end, ok, Hosts).
+sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) ->
+    Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, Root}], Opts),
+    case os:cmd(Cmd) of
+        "ok\n" ->
+            ok;
+        _ ->
+            TargetDirectory = filename:join([PackagesPath, AllInOne]),
+            case extract_package(AllInOne, PackagesPath, Packages) of
+                ok ->
+                    RsyncOptions = "--exclude=clients",
+                    To =
+                        case lists:nth(length(Root), Root) of
+                            $/ ->
+                                Root;
+                            _ ->
+                                Root ++ "/"
+                        end,
+                    Cmd2 = cluster_booter_cmd:cmd({rsync, TargetDirectory ++ "/", To, RsyncOptions}, Opts),
+                    os:cmd(Cmd2),
+                    ok;
+                {error, Reason} ->
+                    {error, Reason}
+            end
+    end.
 
-sync_root_dir(Root, Options) ->
-    RsyncOptions = "-e clients",
-    cluster_booter_cmd:cmd({rsync, ".", Root, RsyncOptions}, Options).
+sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne) ->
+    FromPath = filename:join([PackagesPath, AllInOne]),
+    ClientDir = filename:join([Root, "clients", Node]),
+    Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts),
+    case os:cmd(Cmd) of
+        "ok\n" ->
+            ok;
+        _ ->
+            From = filename:join([FromPath, "clients", Node]) ++ "/",
+            case filelib:is_dir(From) of
+                true ->
+                    To = filename:join([Root, "clients", Node]) ++ "/",
+                    Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
+                    os:cmd(Cmd2),
+                    Cmd3 = cluster_booter_cmd:cmd({rsync, From, To, ""}, Opts),
+                    os:cmd(Cmd3),
+                    LibDir = filename:join(To, "lib"),
+                    LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),
+                    LinkMnesiaDir2 = filename:join([Root, "mnesia", Node]),
+                    MnesiaDir = filename:join(To, "mnesia"),
+                    Cmd4 = cluster_booter_cmd:cmd("ln -s ../../lib " ++ LibDir, Opts),
+                    os:cmd(Cmd4),
+                    Cmd5 = cluster_booter_cmd:cmd(mkdir, [{dir, LinkMnesiaDir2}], Opts),
+                    os:cmd(Cmd5),
+                    Cmd6 = cluster_booter_cmd:cmd("ln -s " ++ LinkMnesiaDir ++ " " ++ MnesiaDir, Opts),
+                    os:cmd(Cmd6),
+                    ok;
+                false ->
+                    {error, {client_not_exists, Node}}
+            end
+    end.
 
-sync_client_dir(Root, Node, Options) ->
-    From = filename:join(["clients", Node]),
-    To = filename:join([Root, "clients", Node]),
-    cluster_booter_cmd:cmd({rsync, From, To, ""}, Options).
+extract_package(AllInOne, PackagesPath, Packages) ->
+    TargetDirectory = filename:join([PackagesPath, AllInOne]),
+    case filelib:is_dir(TargetDirectory) of
+        false ->
+            case get_latest_version(AllInOne, Packages) of
+                {ok, Version} ->
+                    File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ "-" ++ Version ++ ".tar.gz"]),
+                    io:format("file is ~s~n", [File]),
+                    Result = erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]),
+                    io:format("result is ~p~n", [Result]),
+                    Result;
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        true ->
+            ok
+    end.
+                    
