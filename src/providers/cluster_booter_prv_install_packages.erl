@@ -167,7 +167,7 @@ sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) ->
                             _ ->
                                 Root ++ "/"
                         end,
-                    Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, TargetDirectory}], Opts),
+                    Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
                     os:cmd(Cmd2),
                     Cmd3 = cluster_booter_cmd:cmd({rsync, TargetDirectory ++ "/", To, RsyncOptions}, Opts),
                     os:cmd(Cmd3),
