@@ -173,7 +173,8 @@ update_table_copies(MasterNode, TableName, Nodes, NewNodes) ->
     lists:foreach(
       fun(Node) ->
               {atomic, ok} = rpc:call(MasterNode, mnesia, del_table_copy, [TableName, Node])
-      end, RemovedCopies).
+      end, RemovedCopies),
+    rpc:call(MasterNode, mnesia, wait_for_tables, [[TableName], 3000]).
 
 create_table(MasterNode, #{table := TableName, fields := Fields, nodes := Nodes, name := Name} = Table) ->
     Indexes = maps:get(indexes, Table, []),
