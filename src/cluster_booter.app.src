@@ -2,7 +2,7 @@
 {application, cluster_booter,
  [
   {description, "Cluster Booter"},
-  {vsn, "0.3.1"},
+  {vsn, "0.3.2"},
   {id, "cluster_booter"},
   {modules,      []},
   {registered,   []},
