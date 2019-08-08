@@ -15,7 +15,7 @@
 %%% API
 %%%===================================================================
 scan_binary(Bin) ->
-    TermString = binary_to_list(Bin),
+    TermString = unicode:characters_to_list(Bin, utf8),
     scan_string(TermString).
 
 scan_string(TermString) ->
