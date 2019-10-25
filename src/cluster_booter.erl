@@ -21,7 +21,7 @@ main(Args) ->
     main(Args, []).
 
 main(Args, Opts) ->
-    case getopt:parse([], Args) of
+    case getopt:parse([{config, $c, "config", {string, "booter.config"}, "Cluster Booter Config File"}], Args) of
         {ok, {Options, NonOptions}} ->
             do(Options ++ Opts, NonOptions);
         {error, Detail} ->

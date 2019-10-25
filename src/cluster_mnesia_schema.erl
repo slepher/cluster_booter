@@ -15,19 +15,22 @@
 -callback(tables() -> #{atom() := [#{name := atom(), fields := [atom()], table => atom(), indexes => [atom()]}]}).
 
 
-tables(NodeNames, NodeMap, Module) ->
+tables(NodeWithOptions, NodeMap, Module) ->
     NodeNameGroupsMap = Module:applications(),
     GroupTables = Module:tables(),
-    NodeGroups = node_groups(NodeNames, NodeNameGroupsMap, NodeMap),
+    NodeGroups = node_groups(NodeWithOptions, NodeNameGroupsMap, NodeMap),
     table_nodes(NodeGroups, GroupTables).
 
-node_groups(NodeNames, NodeNameGroupsMap, NodeMap) ->
+node_groups(NodeNameWithOpts, NodeNameGroupsMap, NodeMap) ->
+    NodeNames = lists:map(fun({NodeName, _Options}) -> NodeName end, NodeNameWithOpts),
+    NameOptsMap = maps:from_list(NodeNameWithOpts),
     maps:fold(
       fun(NodeName, NodeNameGroups, Acc) ->
               case maps:find(NodeName, NodeMap) of
                   {ok, Node} ->
+                      Options = maps:get(NodeName, NameOptsMap, #{}),
                       NodeGroups = maps:get(Node, Acc, []),
-                      maps:put(Node, lists:usort(NodeNameGroups ++ NodeGroups), Acc);
+                      maps:put(Node, {Options, lists:usort(NodeNameGroups ++ NodeGroups)}, Acc);
                   error ->
                       Acc
               end
@@ -35,7 +38,7 @@ node_groups(NodeNames, NodeNameGroupsMap, NodeMap) ->
 
 table_nodes(NodeGroups, GroupTables) ->
     maps:fold(
-      fun(Node, Groups, Acc0) ->
+      fun(Node, {Options, Groups}, Acc0) ->
               lists:foldl(
                 fun(Group, Acc1) ->
                         case maps:find(Group, GroupTables) of
@@ -43,11 +46,19 @@ table_nodes(NodeGroups, GroupTables) ->
                                 lists:foldl(
                                   fun(Table, Acc2) ->
                                           #{name := Name} = Table,
+                                          Options1 = maps:merge(Options, Table),
                                           TableName = maps:get(table, Table, Name),
                                           AccTable = maps:get(TableName, Acc2, #{}),
-                                          TableNodes = maps:get(nodes, AccTable, []),
+                                          CopyKey = 
+                                              case maps:get(ram_copies, Options1, false) of
+                                                  false ->
+                                                      disc_copies;
+                                                  true ->
+                                                      ram_copies
+                                              end,
+                                          TableNodes = maps:get(CopyKey, AccTable, []),
                                           NTableNodes = ordsets:add_element(Node, TableNodes),
-                                          NAccTable = maps:merge(Table, AccTable#{table => TableName, nodes => NTableNodes}),
+                                          NAccTable = maps:merge(Table, AccTable#{table => TableName, CopyKey => NTableNodes}),
                                           maps:put(TableName, NAccTable, Acc2)
                                   end, Acc1, Tables);
                             error ->

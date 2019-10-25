@@ -16,7 +16,7 @@
 -export([validate_mnesia_clusters/2, validate_mnesia_cluster/2]).
 
 -export([initialize/3,
-         create_schema/1,
+         create_schema/2,
          create_tables/2,
          init_datas/3,
          drop_tables/1
@@ -32,7 +32,8 @@
 validate_mnesia_clusters(MnesiaClusters, NodeMap) ->
     maps:fold(
       fun(ClusterName, NodeNames, Acc) ->
-              case validate_mnesia_cluster(NodeNames, NodeMap) of
+              NodeWithOptions = update_nodes(NodeNames),
+              case validate_mnesia_cluster(NodeWithOptions, NodeMap) of
                   ok ->
                       Acc;
                   {error, Reason} ->
@@ -40,8 +41,51 @@ validate_mnesia_clusters(MnesiaClusters, NodeMap) ->
               end
       end, maps:new(), MnesiaClusters).
 
+update_nodes(NodeNames) ->
+    lists:map(
+      fun(NodeName) when is_atom(NodeName) ->
+              {NodeName, #{}};
+         ({NodeName, Options}) ->
+              {NodeName, format_options(Options)}
+      end, NodeNames).
+
+format_options(Option) when is_atom(Option) ->
+    #{Option => true};
+format_options(Options) when is_list(Options) ->
+    lists:foldl(
+      fun(Key, Acc) when is_atom(Key) ->
+              Acc#{Key => true};
+         ({Key, Value}, Acc) ->
+              Acc#{Key => Value}
+      end, #{}, Options);
+format_options(#{} = Options) ->
+    Options.
+
+disc_copy_nodes(NodeWithOptions) ->
+    lists:foldl(
+      fun({Node, Options}, Acc) ->
+              case maps:get(ram_copies, Options, false) of
+                  false ->
+                      [Node|Acc];
+                  true ->
+                      Acc
+              end
+      end, [], NodeWithOptions).
+
+ram_copy_nodes(NodeWithOptions) ->
+    lists:foldl(
+      fun({Node, Options}, Acc) ->
+              case maps:get(ram_copies, Options, false) of
+                  true ->
+                      [Node|Acc];
+                  false ->
+                      Acc
+              end
+      end, [], NodeWithOptions).
+
 validate_mnesia_cluster(NodeNames, NodeMap) ->
-    Nodes = lists:usort(maps:values(maps:with(NodeNames, NodeMap))),
+    DiscCopyNodeNames = disc_copy_nodes(NodeNames),
+    Nodes = lists:usort(maps:values(maps:with(DiscCopyNodeNames, NodeMap))),
     case master_node(Nodes) of
         {ok, MasterNode} ->
             WorkingNodes = rpc:call(MasterNode, mnesia, table_info, [schema, disc_copies]),
@@ -55,17 +99,23 @@ validate_mnesia_cluster(NodeNames, NodeMap) ->
             {error, Reason}
     end.
 
-create_schema(Nodes) ->
-    case master_node(Nodes) of
+create_schema(NodeWithOptions, NodeMap) ->
+    DiscCopyNodeNames = disc_copy_nodes(NodeWithOptions),
+    RamCopyNodeNames = ram_copy_nodes(NodeWithOptions),
+    DiscCopyNodes = lists:usort(maps:values(maps:with(DiscCopyNodeNames, NodeMap))),
+    RamCopyNodes = lists:usort(maps:values(maps:with(RamCopyNodeNames, NodeMap))),
+    Nodes = DiscCopyNodes ++ RamCopyNodes,
+    case master_node(DiscCopyNodes) of
         {ok, MasterNode} ->
             DiscCopies = rpc:call(MasterNode, mnesia, table_info, [schema, disc_copies]),
             RamCopies = rpc:call(MasterNode, mnesia, table_info, [schema, ram_copies]),
             RestCopies =  Nodes -- DiscCopies -- RamCopies,
+            RestDiscCopies = DiscCopyNodes -- DiscCopies, 
             rpc:call(MasterNode, mnesia, change_config, [extra_db_nodes, RestCopies]),
             lists:foreach(
               fun(RamCopy) ->
                       rpc:call(MasterNode, mnesia, change_table_copy_type, [schema, RamCopy, disc_copies])
-              end, RamCopies ++ RestCopies),
+              end, RestDiscCopies),
             {ok, MasterNode};
         {error, Reason} ->
             {error, Reason}
@@ -82,37 +132,50 @@ validate_nodes(Nodes) ->
               net_adm:ping(Node) /= pong
       end, Nodes).
 
-initialize(NodeNames, NodeMap, Module) ->
-    case boot_mnesia(NodeNames, NodeMap) of
+initialize(NodeWithOptions0, NodeMap, Module) ->
+    NodeWithOptions = update_nodes(NodeWithOptions0),
+    DiscCopyNodeNames = disc_copy_nodes(NodeWithOptions),
+    case boot_mnesia(NodeWithOptions, NodeMap) of
         {ok, ok} ->
-            Nodes = lists:usort(maps:values(maps:with(NodeNames, NodeMap))),
-            case create_schema(Nodes) of
-                {ok, MasterNode} ->
-                    Tables = cluster_mnesia_schema:tables(NodeNames, NodeMap, Module),
-                    CreateTableFails = create_tables(MasterNode, Tables),
-                    case maps:size(CreateTableFails) of
-                        0 ->
-                            ok;
-                        _ ->
-                            {error, {create_table_failed, CreateTableFails}}
-                    end;
-                {error, Reason} ->
-                    {error, Reason}
+            Nodes = lists:usort(maps:values(maps:with(DiscCopyNodeNames, NodeMap))),
+            case Nodes of
+                [] ->
+                    ok;
+                _ ->
+                    case create_schema(NodeWithOptions, NodeMap) of
+                        {ok, MasterNode} ->
+                            Tables = cluster_mnesia_schema:tables(NodeWithOptions, NodeMap, Module),
+                            CreateTableFails = create_tables(MasterNode, Tables),
+                            case maps:size(CreateTableFails) of
+                                0 ->
+                                    ok;
+                                _ ->
+                                    {error, {create_table_failed, CreateTableFails}}
+                            end;
+                        {error, Reason} ->
+                            {error, Reason}
+                    end
             end;
         {error, Reason} ->
             {error, Reason}
     end.
 
-boot_mnesia(NodeNames, NodeMap) ->
-    NodeApplications = lists:foldl(fun(Name, Acc) -> maps:put(Name, [mnesia], Acc) end, maps:new(), NodeNames),
-    case cluster_booter_application:node_applications(NodeNames, NodeMap) of
+boot_mnesia(NodeWithOptions0, NodeMap) ->
+    NodeWithOptions = update_nodes(NodeWithOptions0),
+    NodeNames = lists:map(fun({NodeName, _Options}) -> NodeName end, NodeWithOptions),
+    NodeNames1 = lists:filter(fun(NodeName) -> maps:is_key(NodeName, NodeMap) end, NodeNames),
+    NodeApplications = 
+        lists:foldl(
+          fun(Name, Acc) -> 
+                  maps:put(Name, [mnesia], Acc)
+          end, maps:new(), NodeNames1),
+    case cluster_booter_application:node_applications(NodeNames1, NodeMap) of
         {ok, NodeApplicationsSt} ->
             ApplicationSt = cluster_booter_application:application_st(NodeApplications, NodeApplicationsSt),
             cluster_booter_application:boot_applications(ApplicationSt, NodeMap);
         {error, Reason} ->
             {error, Reason}
     end.
-            
 
 drop_tables(MasterNode) ->
     Tables = tables(MasterNode),
@@ -137,50 +200,42 @@ create_tables(MasterNode, Tables) ->
                           ok ->
                               Acc;
                           {error, Reason} ->
-                      maps:put(TableName, Reason, Acc)
+                              maps:put(TableName, Reason, Acc)
                       end;
                   {error, Reason} ->
                       maps:put(TableName, Reason, Acc)
               end
       end, maps:new(), Tables).
 
-update_table_schema(MasterNode, CurrentTables,
-                    #{table := TableName, fields := Fields, nodes := Nodes} = Table) ->
-    NewTableType = maps:get(type, Table, set),
+update_table_schema(MasterNode, CurrentTables, #{table := TableName} = Table) ->
     case lists:member(TableName, CurrentTables) of
         true ->
             DiscCopies = rpc:call(MasterNode, mnesia, table_info, [TableName, disc_copies]),
-            Attributes = rpc:call(MasterNode, mnesia, table_info, [TableName, attributes]),
-            TableType = rpc:call(MasterNode, mnesia, table_info, [TableName, type]),
-            case {Attributes, TableType} of
-                {Fields, NewTableType} ->
-                    update_table_copies(MasterNode, TableName, DiscCopies, Nodes);
-                _ ->
-                    update_table_copies(MasterNode, TableName, DiscCopies, []),
-                    create_table(MasterNode, Table)
-            end;
+            RamCopies = rpc:call(MasterNode, mnesia, table_info, [TableName, ram_copies]),
+            del_table_copies(MasterNode, TableName, DiscCopies ++ RamCopies),
+            create_table(MasterNode, Table);
         false ->
             create_table(MasterNode, Table)
     end.
 
-update_table_copies(MasterNode, TableName, Nodes, NewNodes) ->
-    AddedCopies = NewNodes -- Nodes,
-    RemovedCopies = Nodes -- NewNodes,
-    lists:foreach(
-      fun(Node) ->
-              {atomic, ok} = rpc:call(MasterNode, mnesia, add_table_copy, [TableName, Node, disc_copies])
-      end, AddedCopies),
+del_table_copies(_MasterNode, _TableName, []) ->
+    ok;
+del_table_copies(MasterNode, TableName, TableNodes) ->
+    rpc:call(MasterNode, mnesia, wait_for_tables, [[TableName], 3000]),
     lists:foreach(
       fun(Node) ->
               {atomic, ok} = rpc:call(MasterNode, mnesia, del_table_copy, [TableName, Node])
-      end, RemovedCopies),
-    rpc:call(MasterNode, mnesia, wait_for_tables, [[TableName], 3000]).
+      end, TableNodes).
 
-create_table(MasterNode, #{table := TableName, fields := Fields, nodes := Nodes, name := Name} = Table) ->
+create_table(MasterNode, #{table := TableName, fields := Fields,
+                           name := Name} = Table) ->
+    TableDiscCopies = maps:get(disc_copies, Table, []),
+    TableRamCopies = maps:get(ram_copies, Table, []),
     Indexes = maps:get(indexes, Table, []),
     TableType = maps:get(type, Table, set),
     case rpc:call(MasterNode, mnesia, create_table, 
-                  [TableName, [{attributes, Fields}, {record_name, Name}, {disc_copies, Nodes}, {type, TableType}]]) of
+                  [TableName, [{attributes, Fields}, {record_name, Name}, 
+                               {disc_copies, TableDiscCopies}, {ram_copies, TableRamCopies}, {type, TableType}]]) of
         {atomic, ok} ->
             lists:foreach(
               fun(Index) ->
