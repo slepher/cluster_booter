@@ -188,12 +188,27 @@ sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne) ->
             LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),
             LinkMnesiaDir2 = filename:join([Root, "mnesia", Node]),
             MnesiaDir = filename:join(To, "mnesia"),
-            Cmd2 = cluster_booter_cmd:cmd("ln -s ../../lib " ++ LibDir, Opts),
-            os:cmd(Cmd2),
-            Cmd3 = cluster_booter_cmd:cmd(mkdir, [{dir, LinkMnesiaDir2}], Opts),
-            os:cmd(Cmd3),
-            Cmd4 = cluster_booter_cmd:cmd("ln -s " ++ LinkMnesiaDir ++ " " ++ MnesiaDir, Opts),
-            os:cmd(Cmd4),
+            case filelib:is_file(LibDir) of
+                true ->
+                    ok;
+                false ->
+                    Cmd2 = cluster_booter_cmd:cmd("ln -s ../../lib " ++ LibDir, Opts),
+                    os:cmd(Cmd2)
+            end,
+            case filelib:is_file(LinkMnesiaDir2) of
+                true ->
+                    ok;
+                false ->
+                    Cmd3 = cluster_booter_cmd:cmd(mkdir, [{dir, LinkMnesiaDir2}], Opts),
+                    os:cmd(Cmd3)
+            end,
+            case filelib:is_file(MnesiaDir) of
+                true ->
+                    ok;
+                false ->
+                    Cmd4 = cluster_booter_cmd:cmd("ln -s " ++ LinkMnesiaDir ++ " " ++ MnesiaDir, Opts),
+                    os:cmd(Cmd4)
+            end,
             ok;
         _ ->
             From = filename:join([FromPath, "clients", Node]) ++ "/",
