@@ -34,14 +34,14 @@ do(State) ->
     NodeMap = cluster_booter_state:node_map(State),
     NodeStatus = cluster_booter_node:check(NodeNames, NodeMap),
     cluster_booter_node:print(NodeStatus),
-    UndefinedNodes = cluster_booter_node:undefined_nodes(NodeStatus),
-    case UndefinedNodes of
-        [] ->
-            NState = cluster_booter_state:node_status(State, NodeStatus),
-            {ok, NState};
-        _ ->
-            {error, {unconfigured_nodes, UndefinedNodes}}
-    end.
+    %% UndefinedNodes = cluster_booter_node:undefined_nodes(NodeStatus),
+    %% case UndefinedNodes of
+    %%    [] ->
+    NState = cluster_booter_state:node_status(State, NodeStatus),
+    {ok, NState}.
+    %%     _ ->
+    %%         {error, {unconfigured_nodes, UndefinedNodes}}
+    %% end.
 
 format_error({unstarted_nodes, Nodes}) when is_list(Nodes) ->
     NodesStr = string:join(lists:map(fun(Node) -> atom_to_list(Node) end, Nodes), ","),

@@ -32,7 +32,7 @@ init(State) ->
 do(State) ->
     case cluster_booter_application:check(State) of
         {ok, NState} ->
-            ApplicationSt = cluster_booter_state:application_st(State),
+            ApplicationSt = cluster_booter_state:main_application_st(NState),
             print_application_st(ApplicationSt),
             {ok, NState};
         {error, Reason} ->

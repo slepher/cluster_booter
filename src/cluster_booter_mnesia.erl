@@ -14,6 +14,7 @@
 
 %% API
 -export([validate_mnesia_clusters/2, validate_mnesia_cluster/2]).
+-export([format_options/1]).
 
 -export([initialize/3,
          create_schema/2,

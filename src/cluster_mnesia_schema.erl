@@ -40,17 +40,19 @@ table_nodes(NodeGroups, GroupTables) ->
     maps:fold(
       fun(Node, {Options, Groups}, Acc0) ->
               lists:foldl(
-                fun(Group, Acc1) ->
+                fun(Group0, Acc1) ->
+                        {Group, GroupOptions} = group_with_options(Group0),
                         case maps:find(Group, GroupTables) of
                             {ok, Tables} ->
                                 lists:foldl(
                                   fun(Table, Acc2) ->
                                           #{name := Name} = Table,
                                           Options1 = maps:merge(Options, Table),
+                                          Options2 = maps:merge(GroupOptions, Options1),
                                           TableName = maps:get(table, Table, Name),
                                           AccTable = maps:get(TableName, Acc2, #{}),
                                           CopyKey = 
-                                              case maps:get(ram_copies, Options1, false) of
+                                              case maps:get(ram_copies, Options2, false) of
                                                   false ->
                                                       disc_copies;
                                                   true ->
@@ -74,3 +76,10 @@ table_master_node(SchemaMasterNode, Table) ->
         [] ->
             {error, no_table}
     end.
+
+group_with_options(Group) when is_atom(Group) ->
+    {Group, #{}};
+group_with_options({Group, Option}) when is_atom(Group) ->
+    Option1 = cluster_booter_mnesia:format_options(Option),
+    {Group, Option1}.
+

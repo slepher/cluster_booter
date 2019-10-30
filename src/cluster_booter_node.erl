@@ -90,10 +90,10 @@ check_node(NodeName, NodeMap) ->
 node(NodeName, Host) ->
     binary_to_atom(list_to_binary([atom_to_list(NodeName), "@", Host]), utf8).
 
-print(#status{started_nodes = StartedNodes, stopped_nodes = StoppedNodes, undefined_nodes = UndefinedNodes}) ->
+print(#status{started_nodes = StartedNodes, stopped_nodes = StoppedNodes}) ->
     print_nodes(StartedNodes, started),
-    print_nodes(StoppedNodes, stopped),
-    print_nodes(UndefinedNodes, undefined).
+    print_nodes(StoppedNodes, stopped).
+    %% print_nodes(UndefinedNodes, undefined).
 
 print_nodes([], _) ->
     ok;

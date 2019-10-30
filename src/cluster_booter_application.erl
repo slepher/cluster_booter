@@ -90,6 +90,7 @@ boot_applications(ApplicationSt, NodeMap) ->
                   io:format("start application ~p at node ~p.~n", [Application, Node]),
                   case cluster_booter_application:boot_application(Node, Application, NodeMap) of
                       {ok, _} ->
+                          io:format("start application ~p end at node ~p.~n", [Application, Node]),
                           Acc;
                       {error, Reason} ->
                           maps:put({Node, Application}, Reason, Acc)
@@ -99,7 +100,7 @@ boot_applications(ApplicationSt, NodeMap) ->
           end, maps:new(), ApplicationSt),
     case maps:size(Result) of
         0 ->
-                    {ok, ok};
+            {ok, ok};
         _ ->
             {error, {application_start_failed, Result}}
     end.
