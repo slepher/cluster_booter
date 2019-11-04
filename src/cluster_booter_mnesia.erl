@@ -208,25 +208,68 @@ create_tables(MasterNode, Tables) ->
               end
       end, maps:new(), Tables).
 
-update_table_schema(MasterNode, CurrentTables, #{table := TableName} = Table) ->
+update_table_schema(MasterNode, CurrentTables, #{table := TableName, fields := Fields} = Table) ->
+    TableDiscCopies = maps:get(disc_copies, Table, []),
+    TableRamCopies = maps:get(ram_copies, Table, []),
+    NewTableType = maps:get(type, Table, set),
     case lists:member(TableName, CurrentTables) of
         true ->
             DiscCopies = rpc:call(MasterNode, mnesia, table_info, [TableName, disc_copies]),
             RamCopies = rpc:call(MasterNode, mnesia, table_info, [TableName, ram_copies]),
-            del_table_copies(MasterNode, TableName, DiscCopies ++ RamCopies),
-            create_table(MasterNode, Table);
+            Attributes = rpc:call(MasterNode, mnesia, table_info, [TableName, attributes]),
+            TableType = rpc:call(MasterNode, mnesia, table_info, [TableName, type]),
+            case {Attributes, TableType} of
+                {Fields, NewTableType} ->
+                    update_table_copies(MasterNode, TableName, RamCopies, DiscCopies, TableRamCopies, TableDiscCopies);
+                _ ->
+                    update_table_copies(MasterNode, TableName, RamCopies, DiscCopies, [], []),
+                    create_table(MasterNode, Table)
+            end;
         false ->
             create_table(MasterNode, Table)
     end.
 
-del_table_copies(_MasterNode, _TableName, []) ->
-    ok;
-del_table_copies(MasterNode, TableName, TableNodes) ->
-    rpc:call(MasterNode, mnesia, wait_for_tables, [[TableName], 3000]),
+update_table_copies(MasterNode, TableName, RamCopies, DiscCopies, RamNodes, DiscNodes) ->
+    DelRamNodes = RamCopies -- RamNodes,
+    DelDiscNodes = DiscCopies -- DiscNodes,
+    DelNodes = (RamCopies ++ DiscCopies) -- (RamNodes ++ DiscNodes),
+    ChangeRamNodes = DelDiscNodes -- DelNodes,
+    ChangeDiscNodes = DelRamNodes -- DelNodes,
+    NewRamNodes = (RamNodes -- RamCopies) -- ChangeRamNodes,
+    NewDiscNodes = (DiscNodes -- DiscCopies) -- ChangeDiscNodes,
+    ok = rpc:call(MasterNode, mnesia, wait_for_tables, [[TableName], 3000]),
+    change_table_copies(MasterNode, TableName, ChangeDiscNodes, disc_copies),
+    change_table_copies(MasterNode, TableName, ChangeRamNodes, ram_copies),
+    add_table_copies(MasterNode, TableName, NewDiscNodes, disc_copies),
+    add_table_copies(MasterNode, TableName, NewRamNodes, ram_copies),
+    del_table_copies(MasterNode, TableName, DelNodes).
+
+change_table_copies(MasterNode, TableName, ChangedCopies, TableCopyType) ->
+    log_tables(ChangedCopies, TableName, {change_table_copies, TableCopyType}),
+    lists:foreach(
+      fun(Node) ->
+              {atomic, ok} = rpc:call(MasterNode, mnesia, change_table_copy_type, [TableName, Node, TableCopyType])
+      end, ChangedCopies).
+
+add_table_copies(MasterNode, TableName, AddedCopies, TableCopyType) ->
+    log_tables(AddedCopies, TableName, {add_table_copies, TableCopyType}),
+    lists:foreach(
+      fun(Node) ->
+              {atomic, ok} = rpc:call(MasterNode, mnesia, add_table_copy, [TableName, Node, TableCopyType])
+      end, AddedCopies).
+
+del_table_copies(MasterNode, TableName, RemovedCopies) ->
+    log_tables(RemovedCopies, TableName, del_table_copies),
     lists:foreach(
       fun(Node) ->
               {atomic, ok} = rpc:call(MasterNode, mnesia, del_table_copy, [TableName, Node])
-      end, TableNodes).
+      end, RemovedCopies).
+
+log_tables([], _TableName, _Attr) ->
+    ok;
+log_tables(Copies, Table, Attr) ->
+    io:format("~p ~p ~p~n", [Attr, Copies, Table]).
+
 
 create_table(MasterNode, #{table := TableName, fields := Fields,
                            name := Name} = Table) ->
