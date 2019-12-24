@@ -19,7 +19,7 @@ check(State) ->
     NodeMap = cluster_booter_state:node_map(State),
     NodeStatus = cluster_booter_state:node_status(State),
     StartedNodes = cluster_booter_node:started_nodes(NodeStatus),
-    NodeMainApplications = cluster_booter_state:releases(State),
+    NodeMainApplications = cluster_booter_state:main_applications(State),
     case cluster_booter_application:node_applications(StartedNodes, NodeMap) of
         {ok, NodeApplications} ->
             ApplicationSt = cluster_booter_application:application_st(NodeMainApplications, NodeApplications),

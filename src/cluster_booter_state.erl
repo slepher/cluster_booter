@@ -8,11 +8,13 @@
 %%%-------------------------------------------------------------------
 -module(cluster_booter_state).
 
+-include_lib("astranaut/include/rebinding.hrl").
+
 %% API
 -export([new/0]).
 -export([validate/1, transform/1]).
 -export([create_all_providers/2]).
--export([load_terms/2]).
+-export([load_terms/2, load_cluster/1]).
 -export([initialize/1]).
 -export([get_env/2, get_env/3, get_node/2]).
 -export([add_provider/2, add_to_provider_hooks/3]).
@@ -42,6 +44,7 @@
                   sys_config,
                   vm_args,
                   erl_env,
+                  cluster_name,
                   node_name,
                   cookie,
                   nodes = [], 
@@ -54,9 +57,12 @@
                   mnesia_nodes = maps:new(),
                   mnesia_schema,
                   all_in_one = false,
+                  main_applications = maps:new(),
                   releases = maps:new(),
+                  applications = maps:new(),
                   application_st = maps:new(),
                   main_application_st = maps:new(),
+                  version,
                   allow_provider_overrides=false}).
 
 -type t() :: #state_t{}.
@@ -110,8 +116,44 @@ initialize(State) ->
                 InitProviders
         end,
     case create_all_providers(State, Providers ++ AddedProviders) of
-        {ok, NState} ->
-            init_provider_hooks(NState);
+        {ok, State} ->
+            init_provider_hooks(State);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+load_cluster(State) ->
+    PackagePath = cluster_booter_state:packages_path(State),
+    Version = cluster_booter_state:version(State),
+    ClusterFile = 
+        case Version of
+            undefined ->
+                filename:join([PackagePath, "clus"]);
+            Version ->
+                filename:join([PackagePath, "releases", Version, "clus"])
+        end,
+    case file:consult(ClusterFile) of
+        {ok, [{cluster, ClusterName, ClusterVersion, Releases, Applications}]} ->
+            {ReleaseMap, MainAppMap} = 
+                lists:foldl(
+                  fun({ReleaseName, ReleaseVsn, MainApps}, {VsnAcc, MainAppsAcc}) ->
+                          VsnAcc1 = maps:put(ReleaseName, ReleaseVsn, VsnAcc),
+                          MainAppsAcc1 = maps:put(ReleaseName, MainApps, MainAppsAcc),
+                          {VsnAcc1, MainAppsAcc1}
+                  end, {maps:new(), maps:new()}, Releases),
+            ApplicationMap = 
+                lists:foldl(
+                  fun({AppName, AppVsn}, Acc) ->
+                          maps:put(AppName, AppVsn, Acc)
+                  end, maps:new(), Applications),
+            State = cluster_booter_state:cluster_name(State, ClusterName),
+            State = cluster_booter_state:version(State, ClusterVersion),
+            State = cluster_booter_state:releases(State, ReleaseMap),
+            State = cluster_booter_state:main_applications(State, MainAppMap),
+            State = cluster_booter_state:applications(State, ApplicationMap),
+            {ok, State};
+        {error, enoent} ->
+            {error, {load_clutser_file_failed, ClusterFile}};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -195,6 +237,9 @@ load_term({hooks, Hooks}, State) ->
 load_term({env, Env}, State) ->
     NState = env(State, Env),
     {ok, NState};
+load_term({version, Version}, State) ->
+    State1 = version(State, Version),
+    {ok, State1};
 load_term({variables, Variables}, State) ->
     NVariables = maps:from_list(Variables),
     NState = variables(State, NVariables),
@@ -270,8 +315,8 @@ init_provider_hooks(#state_t{providers = Providers, provider_hooks = Hooks} = St
               (_, {error, Reason}) ->
                    {error, Reason}
            end, {ok, Providers}, Hooks) of
-        {ok, NProviders} ->
-            {ok, State#state_t{providers = NProviders}};
+        {ok, Providers} ->
+            {ok, State#state_t{providers = Providers}};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -319,15 +364,15 @@ create_all_providers(State, []) ->
     {ok, State};
 create_all_providers(State, [Module | Rest]) ->
     case providers:new(Module, State) of
-        {ok, State1} ->
-            create_all_providers(State1, Rest);
+        {ok, State} ->
+            create_all_providers(State, Rest);
         Error ->
              Error
     end.
 
 provider_exists(P, Module, Name, Namespace) ->
     case {providers:impl(P), providers:namespace(P)} of
-        {Name, Namespace} ->
+        {+Name, +Namespace} ->
             io:format("Not adding provider ~p ~p from module ~p because it already exists from module ~p", 
                       [Namespace, Name, Module, providers:module(P)]),
             true;

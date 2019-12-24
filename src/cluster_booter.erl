@@ -21,12 +21,18 @@ main(Args) ->
     main(Args, []).
 
 main(Args, Opts) ->
-    case getopt:parse([{config, $c, "config", {string, "booter.config"}, "Cluster Booter Config File"}], Args) of
+    case getopt:parse(cmd_arg_opts(), Args) of
         {ok, {Options, NonOptions}} ->
             do(Options ++ Opts, NonOptions);
         {error, Detail} ->
             format_error(Detail)
     end.
+
+cmd_arg_opts() ->
+    [
+     {config, $c, "config", {string, "booter.config"}, "Cluster Booter Config File"},
+     {version, $v, "version", {string, ""}, "Cluster Version"}
+    ].
 
 init_state(Options) ->
     State = cluster_booter_state:new(),
@@ -37,8 +43,9 @@ init_state(Options) ->
            NConfig = cluster_booter_config_base:merge_configs(Config, DefaultConfig),
            State1 <- cluster_booter_state:load_terms(NConfig, State),
            State2 <- cluster_booter_state:transform(State1),
-           cluster_booter_state:validate(State2),
-           cluster_booter_state:initialize(State2)
+           State3 <- cluster_booter_state:load_cluster(State2),
+           cluster_booter_state:validate(State3),
+           cluster_booter_state:initialize(State3)
        ]).
 
 do(Options, NonOptions) ->
@@ -61,7 +68,6 @@ do(Options, NonOptions) ->
         {error, Reason} ->
             handle_output(no_state, command_line, {error, Reason})
     end.
-
 
 set_node_name_and_cookie(State) ->
     NodeName = cluster_booter_state:node_name(State),
