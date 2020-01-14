@@ -54,6 +54,14 @@ add_path() {
 SCRIPT_DIR="$(cd `dirname "$SCRIPT"` && pwd -P)"
 RELEASE_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
+VSN_FILE=$RELEASE_ROOT_DIR/clients/$REL_NAME/releases/start_erl.data
+
+[ -z $ERTS_VSN ] && ERTS_VSN=$(cut -f 1 -d" " $VSN_FILE)
+[ -z $REL_VSN ] && REL_VSN=$(cut -f 2 -d" " $VSN_FILE)
+
+echo $ERTS_VSN
+echo $REL_VSN
+
 ERL_OPTS=""
 
 find_erts_dir
@@ -61,12 +69,17 @@ find_erts_dir
 export BINDIR="$ERTS_DIR/bin"
 export LD_LIBRARY_PATH="$ERTS_DIR/lib:$LD_LIBRARY_PATH"
 
+
 if [ -z $CONSOLE ]   
 then
   PIPE_DIR=$RELEASE_ROOT_DIR/epipe/$REL_NAME/
   RUNNER_LOG_DIR=$RELEASE_ROOT_DIR/runner_log/$REL_NAME/
   [ ! -d $PIPE_DIR ] && mkdir -p $PIPE_DIR
   [ ! -d $RUNNER_LOG_DIR ] && mkdir -p $RUNNER_LOG_DIR
+
+  HEART_COMMAND="$SCRIPT_DIR/booter $@"
+  echo $HEART_COMMAND
+  export HEART_COMMAND
   echo "$BINDIR/run_erl" -daemon "$PIPE_DIR" "$RUNNER_LOG_DIR" \
       "exec $SCRIPT -n $REL_NAME -e $ERTS_VSN -r $REL_VSN -c true"
   "$BINDIR/run_erl" -daemon "$PIPE_DIR" "$RUNNER_LOG_DIR" \
