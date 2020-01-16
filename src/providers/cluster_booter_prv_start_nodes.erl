@@ -40,14 +40,7 @@ do(State) ->
                       case cluster_booter_node:started(NodeName, Status) of
                           false ->
                               CmdOpt = cluster_booter_state:cmd_opt(Host, State),
-                              ClientDir = 
-                                  case AllInOne of
-                                      false ->
-                                          BaseDir;
-                                      _AllInOne ->
-                                          filename:join([BaseDir, "clients"])
-                                  end,
-                              CmdArg = [{node_name, NodeName}, {release_name, Release}, {base_dir, ClientDir}],
+                              CmdArg = [{node_name, NodeName}, {cluster_name, AllInOne}, {base_dir, BaseDir}],
                               Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
                               io:format("cmd is ~s~n", [Cmd]),
                               os:cmd(Cmd),

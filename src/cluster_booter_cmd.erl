@@ -67,10 +67,10 @@ gen_cmd(start, Args) ->
     Start ++ " start";
 gen_cmd(start_boot, Args) ->
     NodeName = proplists:get_value(node_name, Args),
-    ReleaseName = proplists:get_value(release_name, Args),
+    ClusterName = proplists:get_value(cluster_name, Args),
     BaseDir = proplists:get_value(base_dir, Args),
-    Start = filename:join([BaseDir, NodeName, "bin", ReleaseName]),
-    Start ++ " start_boot load";
+    Start = filename:join([BaseDir, "bin", ClusterName]),
+    lists:flatten(io_lib:format("~s -n ~s", [Start, NodeName]));
 gen_cmd(extract, Args) ->
     Filename = proplists:get_value(filename, Args),
     TargetDirectory = proplists:get_value(target_directory, Args),
