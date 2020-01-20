@@ -72,7 +72,7 @@ consult_file(ConfigFile) ->
                 undefined ->
                     {ok, Terms};
                 VarFile ->
-                    case variables(VarFile) of
+                    case variable_files_vars(VarFile) of
                         {ok, Variables} ->
                             consult_with_variables(Variables, ConfigFile);
                         {error, Reason} ->
@@ -88,7 +88,29 @@ consult_with_variables(Variables, ConfigFile) ->
     Configs = cluster_booter_terms:scan_binary(ConfigString),
     {ok, Configs}.
 
-variables(ConfigVariableFile) ->
+
+variable_files_vars(VariableFiles) when is_list(VariableFiles) ->
+    case lists:nth(1, VariableFiles) of
+        VariableFile when is_list(VariableFile) ->
+            variable_files_vars_1(VariableFiles, maps:new());
+        _ ->
+            variable_files_vars_1([VariableFiles], maps:new())
+    end.
+
+variable_files_vars_1([ConfigVariableFile|T], Acc) ->
+    case variable_file_vars(ConfigVariableFile) of
+        {ok, Terms} ->
+            TermMap = maps:from_list(Terms),
+            TermMap1 = maps:merge(Acc, TermMap),
+            variable_files_vars_1(T, TermMap1);
+        {error, Reason} ->
+            {error, Reason}
+    end;
+variable_files_vars_1([], Acc) ->
+    {ok, maps:to_list(Acc)}.
+
+    
+variable_file_vars(ConfigVariableFile) ->
     case filelib:is_regular(ConfigVariableFile) of
         true ->
             case file:consult(ConfigVariableFile) of

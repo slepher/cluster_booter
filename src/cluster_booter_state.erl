@@ -153,7 +153,7 @@ load_cluster(State) ->
             State = cluster_booter_state:applications(State, ApplicationMap),
             {ok, State};
         {error, enoent} ->
-            {error, {load_clutser_file_failed, ClusterFile}};
+            {error, {load_cluster_file_failed, ClusterFile}};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -223,8 +223,14 @@ load_term({add_providers, Providers}, State) ->
     NState = added_providers(State, Providers),
     {ok, NState};
 load_term({root, Root}, State) ->
-    NState = root(State, Root),
-    {ok, NState};
+    case file:get_cwd() of
+        {ok, Cwd} ->
+            Root1 = filename:absname_join(Cwd, Root),
+            NState = root(State, Root1),
+            {ok, NState};
+        {error, Reason} ->
+            {error, Reason}
+    end;
 load_term({current_host, CurrentHost}, State) ->
     NState = current_host(State, CurrentHost),
     {ok, NState};

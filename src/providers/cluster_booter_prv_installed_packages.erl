@@ -34,6 +34,7 @@ init(State) ->
 do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
     Root = cluster_booter_state:root(State),
+    io:format("root is ~p~n", [Root]),
     Hosts = cluster_booter_state:hosts(State),
     CurrentHost = cluster_booter_state:current_host(State),
     InstalledPackages = 
