@@ -125,12 +125,13 @@ initialize(State) ->
 load_cluster(State) ->
     PackagePath = cluster_booter_state:packages_path(State),
     Version = cluster_booter_state:version(State),
+    AllInOne = cluster_booter_state:all_in_one(State),
     ClusterFile = 
         case Version of
             undefined ->
-                filename:join([PackagePath, "clus"]);
+                filename:join([PackagePath, "releases", atom_to_list(AllInOne) ++ ".clus"]);
             Version ->
-                filename:join([PackagePath, "releases", Version, "clus"])
+                filename:join([PackagePath, "releases", Version, atom_to_list(AllInOne) ++ "clus"])
         end,
     case file:consult(ClusterFile) of
         {ok, [{cluster, ClusterName, ClusterVersion, Releases, Applications}]} ->
