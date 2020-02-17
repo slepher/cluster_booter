@@ -62,7 +62,9 @@
                   applications = maps:new(),
                   application_st = maps:new(),
                   main_application_st = maps:new(),
+                  data = "",
                   version,
+                  import_groups = [],
                   allow_provider_overrides=false}).
 
 -type t() :: #state_t{}.
@@ -274,6 +276,9 @@ load_term({pipe_dir, PipeDir}, State) ->
     {ok, NState};
 load_term({all_in_one, AllInOne}, State) when is_atom(AllInOne) ->
     NState = all_in_one(State, AllInOne),
+    {ok, NState};
+load_term({data, Data}, State) ->
+    NState = data(State, Data),
     {ok, NState};
 load_term(_Term, State) ->
     {ok, State}.

@@ -29,6 +29,7 @@ init(State) ->
 
 do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
+    io:format("all in one is ~p~n", [AllInOne]),
     BaseDir = cluster_booter_state:root(State),
     Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
