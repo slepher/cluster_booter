@@ -32,7 +32,8 @@ cmd_arg_opts() ->
     [
      {config, $c, "config", {string, "booter.config"}, "Cluster Booter Config File"},
      {version, $v, "version", {string, ""}, "Cluster Version"},
-     {data, $d, "data", {string, ""}, "Data File Name"}
+     {data, $d, "data", {string, ""}, "Data File Name"},
+     {groups, $g, "groups", {string, ""}, "Groups"}
     ].
 
 init_state(Options) ->

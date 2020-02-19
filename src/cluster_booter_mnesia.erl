@@ -26,6 +26,7 @@
 -export([cluster_nodes/2, master_node/1, tables/1, validate_schema/1,
          cookie_tables_map/1]).
 
+-export([update_nodes/1]).
 %%%===================================================================
 %%% API
 %%%===================================================================

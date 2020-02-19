@@ -64,7 +64,8 @@
                   main_application_st = maps:new(),
                   data = "",
                   version,
-                  import_groups = [],
+                  groups = [],
+                  imported_groups = [],
                   allow_provider_overrides=false}).
 
 -type t() :: #state_t{}.
@@ -280,6 +281,12 @@ load_term({all_in_one, AllInOne}, State) when is_atom(AllInOne) ->
 load_term({data, Data}, State) ->
     NState = data(State, Data),
     {ok, NState};
+load_term({groups, Groups}, State) ->
+    Groups1 = string:split(Groups, "+"),
+    Groups2 = lists:map(fun(Group) -> list_to_atom(Group) end, Groups1),
+    State1 = cluster_booter_state:groups(State, Groups2),
+    {ok, State1};
+    
 load_term(_Term, State) ->
     {ok, State}.
 

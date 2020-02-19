@@ -72,7 +72,9 @@ import_from_dump_if(State) ->
         DumpFile ->
             case file:consult(DumpFile) of
                 {ok, DumpData} ->
-                    init_nodes(DumpData, State);
+                    Groups = proplists:get_value(groups, DumpData, []),
+                    State1 = cluster_booter_state:imported_groups(State, Groups),
+                    init_nodes(DumpData, State1);
                 {error, Reason} ->
                     {error, Reason}
             end
@@ -80,17 +82,26 @@ import_from_dump_if(State) ->
 
 init_nodes([], State) ->
     {ok, State};
+init_nodes([{groups, _}|T], State) ->
+    init_nodes(T, State);
 init_nodes([{NodeName, DumpData}|T], State) ->
-    MasterNode = cluster_booter_state:get_node(NodeName, State),
-    Groups = proplists:get_value(groups, DumpData, []),
-    Groups0 = cluster_booter_state:import_groups(State),
-    State1 = cluster_booter_state:import_groups(State, Groups ++ Groups0),
-    Datas = proplists:get_value(records, DumpData, []),
-    case init_tables(MasterNode, Datas) of
-        ok ->
-            init_nodes(T, State1);
-        {error, Reason} ->
-            {error, Reason}
+    MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
+    case maps:find(NodeName, MnesiaNodeMap) of
+        {ok, MnesiaNodes} ->
+            MasterNodeName = mnesia_master_node(MnesiaNodes),
+            MasterNode = cluster_booter_state:get_node(MasterNodeName, State),
+            Groups = proplists:get_value(groups, DumpData, []),
+            Groups0 = cluster_booter_state:imported_groups(State),
+            State1 = cluster_booter_state:imported_groups(State, Groups ++ Groups0),
+            Datas = proplists:get_value(records, DumpData, []),
+            case init_tables(MasterNode, Datas) of
+                ok ->
+                    init_nodes(T, State1);
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        error ->
+            init_nodes(T, State)
     end.
 
 init_tables(_MasterNode, []) ->
@@ -119,3 +130,8 @@ init_datas(MasterNode, Table, Datas) ->
         {aborted, Reason} ->
             {error, Reason}
     end.
+
+mnesia_master_node([{Node, _Opts}|_T]) ->
+    Node;
+mnesia_master_node([Node|_T]) when is_atom(Node) ->
+    Node.
