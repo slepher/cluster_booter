@@ -65,6 +65,7 @@
                   main_application_st = maps:new(),
                   data = "",
                   version,
+                  upgrade_version,
                   groups = [],
                   imported_groups = [],
                   allow_provider_overrides=false}).
@@ -244,6 +245,9 @@ load_term({env, Env}, State) ->
     {ok, NState};
 load_term({version, Version}, State) ->
     State1 = version(State, Version),
+    {ok, State1};
+load_term({upgrade, Version}, State) ->
+    State1 = upgrade_version(State, Version),
     {ok, State1};
 load_term({variables, Variables}, State) ->
     NVariables = maps:from_list(Variables),
