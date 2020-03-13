@@ -34,18 +34,25 @@ do(State) ->
     Nodes = cluster_booter_state:nodes(State),
     NodeMap = cluster_booter_state:node_map(State),
     Status = cluster_booter_node:check(Nodes, NodeMap),
+    Releases = cluster_booter_state:releases(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, NodeName, ok) ->
               case cluster_booter_state:installed(Host, Release, State) of
                   true ->
                       case cluster_booter_node:started(NodeName, Status) of
                           false ->
-                              CmdOpt = cluster_booter_state:cmd_opt(Host, State),
-                              CmdArg = [{node_name, NodeName}, {cluster_name, AllInOne}, {base_dir, BaseDir}],
-                              Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
-                              io:format("cmd is ~s~n", [Cmd]),
-                              os:cmd(Cmd),
-                              io:format("start ~p at ~s~n", [Release, Host]);
+                              case maps:find(Release, Releases) of
+                                  {ok, ReleaseVsn} ->
+                                      CmdOpt = cluster_booter_state:cmd_opt(Host, State),
+                                      CmdArg = [{node_name, NodeName}, {cluster_name, AllInOne},
+                                                {base_dir, BaseDir}, {vsn, ReleaseVsn}],
+                                      Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
+                                      io:format("cmd is ~s~n", [Cmd]),
+                                      os:cmd(Cmd),
+                                      io:format("start ~p at ~s~n", [Release, Host]);
+                                  error ->
+                                      io:format("no release vsn of ~p", [Release])
+                              end;
                           true ->
                               ok
                       end;

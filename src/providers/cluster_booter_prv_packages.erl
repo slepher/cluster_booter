@@ -29,10 +29,12 @@ init(State) ->
 
 do(State) ->
     PackagePath = cluster_booter_state:packages_path(State),
-    Packages = packages(PackagePath),
+    {Packages, UpgradePackages} = packages(PackagePath),
     format_packages(Packages),
-    NState = cluster_booter_state:packages(State, Packages),
-    {ok, NState}.
+    format_upgrade_packages(UpgradePackages),
+    State1 = cluster_booter_state:packages(State, Packages),
+    State2 = cluster_booter_state:upgrade_packages(State1, UpgradePackages),
+    {ok, State2}.
 
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
@@ -44,17 +46,29 @@ format_error(Reason) ->
 packages(PackagePath) ->
     Files = filelib:wildcard("*.tar.gz", PackagePath),
     lists:foldl(
-      fun(Filename, Acc) ->
+      fun(Filename, {PAcc, UAcc} = Acc) ->
               Basename = filename:basename(Filename, ".tar.gz"),
-              case string:split(Basename, "-") of
+              case string:split(Basename, "_") of
                   [ReleaseName, Version] ->
-                      VersionMap = maps:get(ReleaseName, Acc, maps:new()),
-                      NVersionMap = maps:put(Version, filename:join(PackagePath, Filename), VersionMap),
-                      maps:put(list_to_atom(ReleaseName), NVersionMap, Acc);
+                      Release = list_to_atom(ReleaseName),
+                      case string:split(Version, "-") of
+                          [From, To] ->
+                              VersionMap = maps:get(Release, UAcc, maps:new()),
+                              FromMap = maps:get(To, VersionMap, maps:new()),
+                              FromMap1 = maps:put(From, filename:join(PackagePath, Filename), FromMap),
+                              VersionMap1 = maps:put(To, FromMap1, VersionMap),
+                              UAcc1 = maps:put(Release, VersionMap1, UAcc),
+                              {PAcc, UAcc1};
+                          _ ->
+                              VersionMap = maps:get(Release, PAcc, maps:new()),
+                              VersionMap1 = maps:put(Version, filename:join(PackagePath, Filename), VersionMap),
+                              PAcc1 = maps:put(Release, VersionMap1, PAcc),
+                              {PAcc1, UAcc}
+                      end;
                   _ ->
                       Acc
               end
-      end, maps:new(), Files).
+      end, {maps:new(), maps:new()}, Files).
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -74,3 +88,13 @@ format_packages(Packages) ->
       end, ok, Packages).
                   
                         
+format_upgrade_packages(Packages) ->
+    maps:fold(
+      fun(Package, VersionMap, ok) ->
+              maps:fold(
+                fun(To, FromMap, ok) ->
+                        Versions = maps:keys(FromMap),
+                        io:format("~p:~s from ~s~n", [Package, To, string:join(lists:usort(Versions), ",")]),
+                        ok
+                end, ok, VersionMap)
+      end, ok, Packages).

@@ -31,11 +31,12 @@ do(State) ->
     SysConfig = cluster_booter_state:sys_config(State),
     VMArgs = cluster_booter_state:vm_args(State),
     EnvFile = cluster_booter_state:erl_env(State),
-    NodeVersions = cluster_booter_state:node_versions(State),
+    %% NodeVersions = cluster_booter_state:node_versions(State),
+    Releases = cluster_booter_state:releases(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, Node, Acc) ->
               CmdOpts = [{host, Host}, {current_host, CurrentHost}],
-              case maps:find(Node, NodeVersions) of
+              case maps:find(Release, Releases) of
                   {ok, Version} ->
                       SysConfigTemplate = bbmustache:parse_file(SysConfig),
                       VMArgsTemplate = bbmustache:parse_file(VMArgs),

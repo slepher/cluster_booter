@@ -34,6 +34,7 @@
                   log_dir = ".",
                   pipe_dir = ".",
                   packages = maps:new(),
+                  upgrade_packages = maps:new(),
                   installed_packages = maps:new(),
                   node_versions = maps:new(),
                   root,
@@ -109,8 +110,10 @@ initialize(State) ->
                  cluster_booter_prv_packages,
                  cluster_booter_prv_installed_packages,
                  cluster_booter_prv_install_packages,
+                 cluster_booter_prv_install_upgrade,
                  cluster_booter_prv_start_nodes,
                  cluster_booter_prv_initialize,
+                 cluster_booter_prv_upgrade,
                  cluster_booter_prv_versions,
                  cluster_booter_prv_config,
                  cluster_booter_prv_stop_nodes
