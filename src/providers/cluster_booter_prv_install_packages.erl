@@ -86,7 +86,7 @@ do_packages(State) ->
     Fun = fun(Host, Node, Release, Version) ->
                   Opts = [{host, Host}, {current_host, CurrentHost}],
                   mkdir(filename:join(Root, Node), Opts),
-                  Filename = filename:join(PackagesPath, atom_to_list(Release) ++ "-" ++ Version ++ ".tar.gz"),
+                  Filename = filename:join(PackagesPath, atom_to_list(Release) ++ "_" ++ Version ++ ".tar.gz"),
                   TargetDirectory = filename:join(Root, Node),
                   Args = [{filename, Filename}, {target_directory, TargetDirectory}],
                   Cmd = cluster_booter_cmd:cmd(extract, Args, Opts),
