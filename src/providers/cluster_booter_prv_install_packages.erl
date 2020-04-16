@@ -153,7 +153,7 @@ do_all_in_one(AllInOne, State) ->
 sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) ->
     Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, Root}], Opts),
     case os:cmd(Cmd) of
-        ["ok"|_T] ->
+        [$o,$k|_T] ->
             ok;
         _ ->
             TargetDirectory = filename:join([PackagesPath, AllInOne]),
@@ -182,7 +182,7 @@ sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne) ->
     ClientDir = filename:join([Root, "clients", Node]),
     Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts),
     case os:cmd(Cmd) of
-        ["ok"|_T] ->
+        [$o,$k|_T] ->
             To = filename:join([Root, "clients", Node]) ++ "/",
             LibDir = filename:join(To, "lib"),
             LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),
