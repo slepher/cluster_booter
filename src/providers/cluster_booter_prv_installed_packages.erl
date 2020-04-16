@@ -56,6 +56,8 @@ do(State) ->
                                 case Value of
                                     "ok\n" ->
                                         maps:put(Node, true, Acc1);
+                                    "ok\r\n" ->
+                                        maps:put(Node, true, Acc1);
                                     _ ->
                                         maps:put(Node, false, Acc1)
                                 end

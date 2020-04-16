@@ -61,11 +61,11 @@ remote_cmd_2(Host, Cmd, Tunnel) when is_list(Cmd) ->
     Psuado = 
         case Tunnel of
             true ->
-                " ";
+                "";
             false ->
-                " -tt "
+                " -tt"
         end,
-    lists:flatten("ssh " ++ Host ++ Psuado ++ "\"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
+    lists:flatten("ssh " ++ Host ++ Psuado ++ " \"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
 
 gen_cmd(processes, _) ->
     "ps aux | grep setcookie | sed 's/  */ /g' | cut -f 11- -d ' '";
