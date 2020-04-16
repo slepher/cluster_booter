@@ -12,7 +12,7 @@
 
 %% API
 -export([new_status/0]).
--export([check/2, started/2, stopped/2]).
+-export([wait_node/2, check/2, started/2, stopped/2]).
 -export([node/2, wait/3]).
 -export([print/1]).
 
@@ -73,6 +73,19 @@ check(NodeNames, NodeMap) ->
                       add_undefined_node(NodeName, StateAcc)
               end
       end, NodeStatus#status{node_map = NodeMap}, NodeNames).
+
+wait_node(_Node, Timeout) when Timeout < 0 ->
+    stopped;
+wait_node(Node, Timeout) ->
+    Now = os:timestamp(),
+    case net_adm:ping(Node) of
+        pong ->
+            ok;
+        pang ->
+            timer:sleep(200),
+            Diff = timer:now_diff(os:timestamp(), Now) div 1000,
+            wait_node(Node, Timeout - Diff)
+    end.
 
 check_node(NodeName, NodeMap) ->
     case maps:find(NodeName, NodeMap) of

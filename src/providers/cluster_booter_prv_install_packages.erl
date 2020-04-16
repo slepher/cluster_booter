@@ -241,7 +241,7 @@ extract_package(AllInOne, PackagesPath, Packages) ->
         false ->
             case get_latest_version(AllInOne, Packages) of
                 {ok, Version} ->
-                    File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ "-" ++ Version ++ ".tar.gz"]),
+                    File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ "_" ++ Version ++ ".tar.gz"]),
                     io:format("file is ~s~n", [File]),
                     Result = erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]),
                     io:format("result is ~p~n", [Result]),

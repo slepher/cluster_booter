@@ -37,6 +37,7 @@ do(State) ->
     Releases = cluster_booter_state:releases(State),
     cluster_booter_state:fold_host_nodes(
       fun(Host, Release, NodeName, ok) ->
+              Node = maps:get(NodeName, NodeMap),
               case cluster_booter_state:installed(Host, Release, State) of
                   true ->
                       case cluster_booter_node:started(NodeName, Status) of
@@ -49,6 +50,7 @@ do(State) ->
                                       Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
                                       io:format("cmd is ~s~n", [Cmd]),
                                       os:cmd(Cmd),
+                                      cluster_booter_node:wait_node(Node, 5000),
                                       io:format("start ~p at ~s~n", [Release, Host]);
                                   error ->
                                       io:format("no release vsn of ~p", [Release])
