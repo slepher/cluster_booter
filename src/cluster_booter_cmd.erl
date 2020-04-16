@@ -55,7 +55,7 @@ remote_cmd(Host, {rsync, From, To, Options}) ->
 remote_cmd(Host, {tunnel, Before, Cmd}) ->
     local_cmd({tunnel, Before, remote_cmd(Host, Cmd)});
 remote_cmd(Host, Cmd) when is_list(Cmd) ->
-    lists:flatten("ssh " ++ Host ++ " -t \"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
+    lists:flatten("ssh " ++ Host ++ " -tt \"" ++ string:replace(Cmd, "\"", "\\\"", all) ++ "\" 2>/dev/null").
 
 gen_cmd(processes, _) ->
     "ps aux | grep setcookie | sed 's/  */ /g' | cut -f 11- -d ' '";
