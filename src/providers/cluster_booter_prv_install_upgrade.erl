@@ -141,7 +141,7 @@ sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne) ->
     ClientDir = filename:join([Root, "clients", Node]),
     Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts),
     case os:cmd(Cmd) of
-        "ok\n" ->
+        ["ok"|_T]->
             To = filename:join([Root, "clients", Node]) ++ "/",
             LibDir = filename:join(To, "lib"),
             LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),

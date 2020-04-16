@@ -54,9 +54,7 @@ do(State) ->
                                 Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, NodeDir}, {node_name, Node}], Opts),
                                 Value = os:cmd(Cmd),
                                 case Value of
-                                    "ok\n" ->
-                                        maps:put(Node, true, Acc1);
-                                    "ok\r\n" ->
+                                    ["ok"|_T] ->
                                         maps:put(Node, true, Acc1);
                                     _ ->
                                         maps:put(Node, false, Acc1)
