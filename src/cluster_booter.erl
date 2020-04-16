@@ -21,7 +21,6 @@ main(Args) ->
     main(Args, []).
 
 main(Args, Opts) ->
-    application:ensure_started(erlexec),
     case getopt:parse(cmd_arg_opts(), Args) of
         {ok, {Options, NonOptions}} ->
             do(Options ++ Opts, NonOptions);
