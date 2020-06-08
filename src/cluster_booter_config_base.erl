@@ -47,7 +47,12 @@ config(CmdTerms, ConfigFile) ->
 config_from_file(_CmdTerms, ConfigFile) ->
     Config0 = case filelib:is_regular(ConfigFile) of
                   true ->
-                      consult_file(ConfigFile);
+                      case consult_file(ConfigFile) of
+                          {ok, Consutled} ->
+                              {ok, Consutled};
+                          {error, Reason} ->
+                              {error, {consult_file_failed, ConfigFile, Reason}}
+                      end;
                   false -> 
                       {error, no_exists}
               end,
@@ -84,10 +89,16 @@ consult_file(ConfigFile) ->
 consult_with_variables(Variables, ConfigFile) ->
     NVariables = lists:map(fun({K, V}) -> {atom_to_list(K), V} end, Variables),
     ConfigTemplate = bbmustache:parse_file(ConfigFile),
-    ConfigString = bbmustache:compile(ConfigTemplate, NVariables),
-    Configs = cluster_booter_terms:scan_binary(ConfigString),
-    {ok, Configs}.
-
+    try bbmustache:compile(ConfigTemplate, NVariables, [raise_on_context_miss]) of
+        ConfigString ->
+            Configs = cluster_booter_terms:scan_binary(ConfigString),
+            {ok, Configs}
+    catch
+        _:{context_missing,{key, Keys}}:_ ->
+            {error, {context_missing_keys, Keys}};
+        T:E:S ->
+            erlang:raise(T,E,S)
+    end.
 
 variable_files_vars(VariableFiles) when is_list(VariableFiles) ->
     case lists:nth(1, VariableFiles) of
