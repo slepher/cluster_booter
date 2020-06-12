@@ -12,7 +12,7 @@
 
 %% API
 -define(PROVIDER, upgrade).
--define(DEPS, [install_upgrade]).
+-define(DEPS, []).
 
 %%%===================================================================
 %%% API

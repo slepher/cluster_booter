@@ -87,6 +87,8 @@ then
 else
   export ROOTDIR="$RELEASE_ROOT_DIR"  
   CODE_LOADING_MODE="${CODE_LOADING_MODE:-embedded}"
+  RELDIR="$RELEASE_ROOT_DIR/clients/$REL_NAME/releases"
+  export RELDIR
   REL_DIR="$RELEASE_ROOT_DIR/clients/$REL_NAME/releases/$REL_VSN"
   BOOTFILE="$REL_DIR/load"
   VMARGS_PATH=$(add_path vm.args $VMARGS_PATH)
