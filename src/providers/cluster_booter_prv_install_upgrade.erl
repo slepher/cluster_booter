@@ -28,18 +28,28 @@ init(State) ->
 
 do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
-    Result = do_all_in_one(AllInOne, State),
-    case Result of
-        ok ->
-            cluster_booter_prv_installed_packages:do(State);
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    do_all_in_one(AllInOne, State).
 
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
 do_all_in_one(AllInOne, State) ->
+    Root = cluster_booter_state:root(State),
+    PackagesPath = cluster_booter_state:packages_path(State),
+    case Root == PackagesPath of
+        true ->
+            io:format("root path and package path is same, no need to install upgrade~n"),
+            {ok, State};
+        false ->
+            case install_packages(AllInOne, State) of
+                ok ->
+                    cluster_booter_prv_installed_packages:do(State);
+                {error, Reason} ->
+                    {error, Reason}
+            end
+    end.
+
+install_packages(AllInOne, State) ->
     Hosts = cluster_booter_state:hosts(State),
     CurrentHost = cluster_booter_state:current_host(State),
     Root = cluster_booter_state:root(State),

@@ -119,7 +119,7 @@ parse_release_file(AllInOne, BaseDir, Node, _Release, CmdOpts) ->
             {ok, AbsForm} = erl_parse:parse_exprs(Tokens),
             {value,Value, _Bs} = erl_eval:exprs(AbsForm, erl_eval:new_bindings()),
             case Value of
-                [{release, _, Version, _, _, _}] ->
+                [{release, _, Version, _, _, _}|_T] ->
                     {ok, Version};
                 {error, Reason} ->
                     {error, Reason}

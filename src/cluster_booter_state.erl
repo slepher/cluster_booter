@@ -112,6 +112,7 @@ initialize(State) ->
                  cluster_booter_prv_installed_packages,
                  cluster_booter_prv_install_packages,
                  cluster_booter_prv_install_upgrade,
+                 cluster_booter_prv_upgrade_config,
                  cluster_booter_prv_start_nodes,
                  cluster_booter_prv_initialize,
                  cluster_booter_prv_upgrade,
@@ -223,19 +224,15 @@ load_term({add_providers, Providers}, State) ->
     NState = added_providers(State, Providers),
     {ok, NState};
 load_term({root, Root}, State) ->
-    case file:get_cwd() of
-        {ok, Cwd} ->
-            Root1 = filename:absname_join(Cwd, Root),
-            NState = root(State, Root1),
-            {ok, NState};
-        {error, Reason} ->
-            {error, Reason}
-    end;
+    Root1 = filename:absname(Root),
+    NState = root(State, Root1),
+    {ok, NState};
 load_term({current_host, CurrentHost}, State) ->
     NState = current_host(State, CurrentHost),
     {ok, NState};
 load_term({packages_path, PackagePath}, State) ->
-    NState = packages_path(State, PackagePath),
+    AbsPath = filename:absname(PackagePath),
+    NState = packages_path(State, AbsPath),
     {ok, NState};
 load_term({hooks, Hooks}, State) ->
     NState = provider_hooks(State, Hooks),
