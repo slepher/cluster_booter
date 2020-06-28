@@ -55,26 +55,37 @@ install_packages(AllInOne, State) ->
     Root = cluster_booter_state:root(State),
     Packages = cluster_booter_state:upgrade_packages(State),
     PackagesPath = cluster_booter_state:packages_path(State),
-    Result = 
-        maps:fold(
-          fun(Host, Nodes, ok) ->
-                  Opts = [{host, Host}, {current_host, CurrentHost}],
-                  case sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) of
-                      ok ->
-                          lists:foldl(
-                            fun(Node, ok) ->
-                                    sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne);
-                               (_Node, {error, Reason}) ->
-                                    {error, Reason}
-                            end, ok, Nodes);
-                      {error, Reason} ->
-                          {error, Reason}
-                  end;
-             (_Host, _Nodes, {error, Reason}) ->
-                  {error, Reason}
-          end, ok, Hosts),
-    os:cmd(lists:flatten(io_lib:format("rm -rf ~s", [filename:join([PackagesPath, AllInOne])]))),
-    Result.
+    io:format("packages path is ~s~n", [PackagesPath]),
+    case get_upgrade_clients(PackagesPath) of
+        {ok, ChangeClients} ->
+            case extract_package(AllInOne, PackagesPath, Packages) of
+                ok ->
+                    Result = 
+                        maps:fold(
+                          fun(Host, Nodes, ok) ->
+                                  Opts = [{host, Host}, {current_host, CurrentHost}],
+                                  case sync_root_dir(Root, Opts, AllInOne, PackagesPath) of
+                                      ok ->
+                                          lists:foldl(
+                                            fun(Node, ok) ->
+                                                    sync_client_dir(Root, Node, Opts, ChangeClients, PackagesPath, AllInOne);
+                                               (_Node, {error, Reason}) ->
+                                                    {error, Reason}
+                                            end, ok, Nodes);
+                                      {error, Reason} ->
+                                          {error, Reason}
+                                  end;
+                             (_Host, _Nodes, {error, Reason}) ->
+                                  {error, Reason}
+                          end, ok, Hosts),
+                    %% os:cmd(lists:flatten(io_lib:format("rm -rf ~s", [filename:join([PackagesPath, AllInOne])]))),
+                    Result;
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 extract_package(AllInOne, PackagesPath, Packages) ->
     TargetDirectory = filename:join([PackagesPath, AllInOne]),
@@ -125,81 +136,62 @@ get_latest_upgrade_version(Release, Packages, To) ->
             {error, no_usabe_packages}
     end.
 
-sync_root_dir(Root, Opts, AllInOne, PackagesPath, Packages) ->
+sync_root_dir(Root, Opts, AllInOne, PackagesPath) ->
     TargetDirectory = filename:join([PackagesPath, AllInOne]),
-    case extract_package(AllInOne, PackagesPath, Packages) of
-        ok ->
-            RsyncOptions = "--exclude=clients",
-            To =
-                case lists:nth(length(Root), Root) of
+    RsyncOptions = "--exclude=clients",
+    To =
+        case lists:nth(length(Root), Root) of
                     $/ ->
-                        Root;
-                    _ ->
-                        Root ++ "/"
-                end,
-            Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
-            os:cmd(Cmd2),
-            Cmd3 = cluster_booter_cmd:cmd({rsync, TargetDirectory ++ "/", To, RsyncOptions}, Opts),
-            os:cmd(Cmd3),
-            ok;
-        {error, Reason} ->
-            {error, Reason}
-    end.
+                Root;
+            _ ->
+                Root ++ "/"
+        end,
+    Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
+    os:cmd(Cmd2),
+    Cmd3 = cluster_booter_cmd:cmd({rsync, TargetDirectory ++ "/", To, RsyncOptions}, Opts),
+    os:cmd(Cmd3),
+    ok.
 
-sync_client_dir(Root, Node, Opts, PackagesPath, AllInOne) ->
-    FromPath = filename:join([PackagesPath, AllInOne]),
-    ClientDir = filename:join([Root, "clients", Node]),
-    Cmd = cluster_booter_cmd:cmd(exists, [{base_dir, ClientDir}], Opts),
-    case os:cmd(Cmd) of
-        [$o,$k|_T] ->
-            To = filename:join([Root, "clients", Node]) ++ "/",
-            LibDir = filename:join(To, "lib"),
-            LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),
-            LinkMnesiaDir2 = filename:join([Root, "mnesia", Node]),
-            MnesiaDir = filename:join(To, "mnesia"),
-            case filelib:is_file(LibDir) of
-                true ->
-                    ok;
-                false ->
-                    Cmd2 = cluster_booter_cmd:cmd("ln -s ../../lib " ++ LibDir, Opts),
-                    os:cmd(Cmd2)
-            end,
-            case filelib:is_file(LinkMnesiaDir2) of
-                true ->
-                    ok;
-                false ->
-                    Cmd3 = cluster_booter_cmd:cmd(mkdir, [{dir, LinkMnesiaDir2}], Opts),
-                    os:cmd(Cmd3)
-            end,
-            case filelib:is_file(MnesiaDir) of
-                true ->
-                    ok;
-                false ->
-                    Cmd4 = cluster_booter_cmd:cmd("ln -s " ++ LinkMnesiaDir ++ " " ++ MnesiaDir, Opts),
-                    os:cmd(Cmd4)
-            end,
-            ok;
-        _ ->
-            From = filename:join([FromPath, "clients", Node]) ++ "/",
+sync_client_dir(Root, Node, Opts, Clients, PackagesPath, AllInOne) ->
+    case maps:find(Node, Clients) of
+        {ok, Vsn} ->
+            FromPath = filename:join([PackagesPath, AllInOne]),
+            From = filename:join([FromPath, "clients", Node, "releases", Vsn]) ++ "/",
+            io:format("from is ~s~n", [From]),
             case filelib:is_dir(From) of
                 true ->
-                    To = filename:join([Root, "clients", Node]) ++ "/",
+                    To = filename:join([Root, "clients", Node, "releases", Vsn]) ++ "/",
                     Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
                     os:cmd(Cmd2),
                     Cmd3 = cluster_booter_cmd:cmd({rsync, From, To, ""}, Opts),
                     os:cmd(Cmd3),
-                    LibDir = filename:join(To, "lib"),
-                    LinkMnesiaDir = filename:join(["..", "..", "mnesia", Node]),
-                    LinkMnesiaDir2 = filename:join([Root, "mnesia", Node]),
-                    MnesiaDir = filename:join(To, "mnesia"),
-                    Cmd4 = cluster_booter_cmd:cmd("ln -s ../../lib " ++ LibDir, Opts),
-                    os:cmd(Cmd4),
-                    Cmd5 = cluster_booter_cmd:cmd(mkdir, [{dir, LinkMnesiaDir2}], Opts),
-                    os:cmd(Cmd5),
-                    Cmd6 = cluster_booter_cmd:cmd("ln -s " ++ LinkMnesiaDir ++ " " ++ MnesiaDir, Opts),
-                    os:cmd(Cmd6),
                     ok;
                 false ->
                     {error, {client_not_exists, Node}}
-            end
+            end;
+        error ->
+            ok
+    end.
+
+clusup_clients(Changes) ->
+    lists:foldl(
+      fun({change, NodeName, Vsn, _FromVsn}, Acc) ->
+              maps:put(NodeName, Vsn, Acc);
+         ({add, NodeName, Vsn}, Acc) ->
+              maps:put(NodeName, Vsn, Acc);
+         (_, Acc) ->
+              Acc
+      end, maps:new(), Changes).
+    
+get_upgrade_clients(PackagesPath) ->
+    ClusupPath = filename:join([PackagesPath, "clusup"]),
+    case file:consult(ClusupPath) of
+        {ok,[{clusup, _ClusterName, Changes}]} ->
+            ChangeClients = clusup_clients(Changes),
+            {ok, ChangeClients};
+        {ok, [{clusup, _ClusterName, Changes, _Extra}]} ->
+            ChangeClients = clusup_clients(Changes),
+            {ok, ChangeClients};
+        {error, Reason} ->
+            {error, Reason}
     end.

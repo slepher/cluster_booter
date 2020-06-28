@@ -66,6 +66,7 @@ format_error({application_not_started, Result}) ->
 %%% Internal functions
 %%%=================================================================== 
 upgrade_changes(ClusterName, [{change, NodeName, Vsn, FromVsn}|T], State) ->
+    io:format("upgrade ~p from ~s to ~s ~n", [NodeName, FromVsn, Vsn]),
     case upgrade_change(NodeName, Vsn, FromVsn, State) of
         {ok, State1} ->
             upgrade_changes(ClusterName, T, State1);
@@ -73,6 +74,7 @@ upgrade_changes(ClusterName, [{change, NodeName, Vsn, FromVsn}|T], State) ->
             {error, Reason}
     end;
 upgrade_changes(ClusterName, [{add, NodeName, Vsn}|T], State) ->
+    io:format("start new node ~p of ~s ~n", [NodeName, Vsn]),
     case upgrade_add(NodeName, Vsn, State) of
         {ok, State1} ->
             upgrade_changes(ClusterName, T, State1);
@@ -80,6 +82,7 @@ upgrade_changes(ClusterName, [{add, NodeName, Vsn}|T], State) ->
             {error, Reason}
     end;
 upgrade_changes(ClusterName, [{remove, NodeName, Vsn}|T], State) ->
+    io:format("stop node ~p of ~s ~n", [NodeName, Vsn]),
     case upgrade_remove(NodeName, Vsn, State) of
         {ok, State1} ->
             upgrade_changes(ClusterName, T, State1);
