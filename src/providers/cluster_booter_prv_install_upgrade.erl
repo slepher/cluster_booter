@@ -78,7 +78,7 @@ install_packages(AllInOne, State) ->
                              (_Host, _Nodes, {error, Reason}) ->
                                   {error, Reason}
                           end, ok, Hosts),
-                    %% os:cmd(lists:flatten(io_lib:format("rm -rf ~s", [filename:join([PackagesPath, AllInOne])]))),
+                    os:cmd(lists:flatten(io_lib:format("rm -rf ~s", [filename:join([PackagesPath, AllInOne])]))),
                     Result;
                 {error, Reason} ->
                     {error, Reason}
@@ -156,18 +156,18 @@ sync_client_dir(Root, Node, Opts, Clients, PackagesPath, AllInOne) ->
     case maps:find(Node, Clients) of
         {ok, Vsn} ->
             FromPath = filename:join([PackagesPath, AllInOne]),
-            From = filename:join([FromPath, "clients", Node, "releases", Vsn]) ++ "/",
-            io:format("from is ~s~n", [From]),
-            case filelib:is_dir(From) of
+            From = filename:join([FromPath, "clients", Node, "releases"]) ++ "/",
+            FromVsn = filename:join([From, Vsn]),
+            case filelib:is_dir(FromVsn) of
                 true ->
-                    To = filename:join([Root, "clients", Node, "releases", Vsn]) ++ "/",
+                    To = filename:join([Root, "clients", Node, "releases"]) ++ "/",
                     Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
                     os:cmd(Cmd2),
                     Cmd3 = cluster_booter_cmd:cmd({rsync, From, To, ""}, Opts),
                     os:cmd(Cmd3),
                     ok;
                 false ->
-                    {error, {client_not_exists, Node}}
+                    {error, {client_not_exists, Node, Vsn}}
             end;
         error ->
             ok
