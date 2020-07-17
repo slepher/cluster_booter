@@ -18,12 +18,10 @@
 %%%===================================================================
 transform([Function|Bindings]) ->
     AtomVarBindings = atom_var_bindings(Bindings, 0),
-    Quoted = astranaut_quote:quote(Function),
-    astranaut_traverse:map_traverse_return(
-      fun(Quoted1) ->
-              quote(?MODULE:rpc_function(unquote(Quoted1), unquote(AtomVarBindings)))
-      end, Quoted).
-
+    Line = erl_syntax:get_pos(Function),
+    Quoted = astranaut:replace_line(astranaut:abstract(Function), Line),
+    quote(?MODULE:rpc_function(unquote(Quoted), unquote(AtomVarBindings))).
+        
 rpc_function(FunctionAst, AtomVarBindings) ->
     BindingValues = 
         lists:foldl(
