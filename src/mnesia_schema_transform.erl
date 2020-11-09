@@ -19,7 +19,8 @@
 %%%===================================================================
 parse_transform(Forms, _Options) ->
     Opts = [{alias, mnesia_schema}, group_args],
-    astranaut_macro:transform_macro(?MODULE, mnesia_schema, 1, Opts, Forms).
+    Return = astranaut_macro:transform_macro(?MODULE, mnesia_schema, 1, Opts, Forms),
+    astranaut_return_m:to_compiler(Return).
 
 format_error(Message) ->
     case io_lib:deep_char_list(Message) of

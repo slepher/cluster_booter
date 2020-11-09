@@ -48,7 +48,7 @@ packages(PackagePath) ->
     lists:foldl(
       fun(Filename, {PAcc, UAcc} = Acc) ->
               Basename = filename:basename(Filename, ".tar.gz"),
-              case string:split(Basename, "_") of
+              case string:split(Basename, "_", trailing) of
                   [ReleaseName, Version] ->
                       Release = list_to_atom(ReleaseName),
                       case string:split(Version, "-") of
