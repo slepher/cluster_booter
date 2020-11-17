@@ -34,19 +34,9 @@ do(State) ->
     ClusupPath = filename:join([PackagesPath, "clusup"]),
     case file:consult(ClusupPath) of
         {ok,[{clusup, ClusterName, Changes}]} ->
-            case downgrade_changes(ClusterName, Changes, State) of
-                {ok, State1} ->
-                    make_permenants(ClusterName, Changes, State1);
-                {error, Reason} ->
-                    {error, Reason}
-            end;
+            downgrade_changes(ClusterName, Changes, State);
         {ok, [{clusup, ClusterName, Changes, _Extra}]} ->
-            case downgrade_changes(ClusterName, Changes, State) of
-                {ok, State1} ->
-                    make_permenants(ClusterName, Changes, State1);
-                {error, Reason} ->
-                    {error, Reason}
-            end;
+            downgrade_changes(ClusterName, Changes, State);
         {error, Reason} ->
             {error, Reason}
     end.
@@ -94,20 +84,6 @@ downgrade_changes(ClusterName, [{remove, NodeName, Vsn}|T], State) ->
 downgrade_changes(_ClusterName, [], State) ->
     {ok, State}.
 
-make_permenants(ClusterName, [{change, NodeName, Vsn, _}|T], State) ->
-    Node = cluster_booter_state:get_node(NodeName, State),
-    case rpc:call(Node, release_handler, make_permanent, [Vsn]) of
-        ok ->
-            io:format("make ~p new release ~s permanent~n", [NodeName, Vsn]),
-            make_permenants(ClusterName, T, State);
-        {error, Reason} ->
-            {error, Reason}
-    end;
-make_permenants(ClusterName, [_Other|T], State) ->
-    make_permenants(ClusterName, T, State);
-make_permenants(_ClusterName, [], State) ->
-    {ok, State}.
-
 downgrade_change(NodeName, Vsn, FromVsn, State) ->
     Node = cluster_booter_state:get_node(NodeName, State),
     case install_release(Node, FromVsn) of
@@ -122,7 +98,7 @@ downgrade_change(NodeName, Vsn, FromVsn, State) ->
         {ok, FromVsn} ->
             case change_vsn_and_clear(Node, Vsn, FromVsn) of
                 ok ->
-                    io:format("~p already installed new release ~s~n", [NodeName, Vsn]),
+                    io:format("~p already downgraded to old release ~s~n", [NodeName, FromVsn]),
                     {ok, State};
                 {error, Reason} ->
                     {error, Reason}
