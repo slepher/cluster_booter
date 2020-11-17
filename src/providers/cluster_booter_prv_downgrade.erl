@@ -157,6 +157,14 @@ make_permenant(Node, Vsn) ->
             {error, Reason}
     end.
 
+set_removed(Node, Vsn, Releases) ->
+    case maps:find(Vsn, Releases) of
+        {ok, _} ->
+            set_removed(Node, Vsn);
+        error ->
+            ok
+    end.
+
 set_removed(Node, Vsn) ->
     case rpc:call(Node, release_handler, set_removed, [Vsn]) of
         ok ->
@@ -167,6 +175,20 @@ set_removed(Node, Vsn) ->
 
 change_vsn_and_clear(Node, Vsn, FromVsn) ->
     do([error_m ||
+           Releases <- current_releaess(Node),
            make_permenant(Node, FromVsn),
-           set_removed(Node, Vsn)
+           set_removed(Node, Vsn, Releases)
        ]).
+
+current_releaess(Node) ->
+    case rpc:call(Node, release_handler, which_releases, []) of
+        Releases when is_list(Releases) ->
+            Statues = 
+                lists:foldl(
+                  fun({_Name, Vsn, _Libs, Status}, Acc) ->
+                          maps:put(Vsn, Status, Acc)
+                  end, #{}, Releases),
+            {ok, Statues};
+        {badrpc, Reason} ->
+            {error, Reason}
+    end.
