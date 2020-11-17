@@ -109,7 +109,7 @@ make_permenants(_ClusterName, [], State) ->
 downgrade_change(NodeName, Vsn, FromVsn, State) ->
     Node = cluster_booter_state:get_node(NodeName, State),
     case install_release(Node, FromVsn) of
-        {ok, {Vsn, OldVsn}} ->
+        {ok, {FromVsn, OldVsn}} ->
             case change_vsn_and_clear(Node, Vsn, FromVsn) of
                 ok ->
                     io:format("~p installed old release ~s replace of ~s~n", [NodeName, OldVsn, Vsn]),
