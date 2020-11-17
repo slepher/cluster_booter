@@ -108,23 +108,23 @@ make_permenants(_ClusterName, [], State) ->
 
 downgrade_change(NodeName, Vsn, FromVsn, State) ->
     Node = cluster_booter_state:get_node(NodeName, State),
-    case install_release(Node, Vsn) of
+    case install_release(Node, FromVsn) of
         {ok, {Vsn, OldVsn}} ->
-            case make_permenant(Node, FromVsn) of
+            case change_vsn_and_clear(Node, Vsn, FromVsn) of
                 ok ->
-                    case set_removed(Node, Vsn) of
-                        ok ->
-                            io:format("~p installed old release ~s replace of ~s~n", [NodeName, OldVsn, Vsn]),
-                            {ok, State};
-                        {error, Reason} ->
-                            {error, Reason}
-                    end;
+                    io:format("~p installed old release ~s replace of ~s~n", [NodeName, OldVsn, Vsn]),
+                    {ok, State};
                 {error, Reason} ->
                     {error, Reason}
             end;
         {ok, Vsn} ->
-            io:format("~p already installed new release ~s~n", [NodeName, Vsn]),
-            {ok, State};
+            case change_vsn_and_clear(Node, Vsn, FromVsn) of
+                ok ->
+                    io:format("~p already installed new release ~s~n", [NodeName, Vsn]),
+                    {ok, State};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.
@@ -162,3 +162,10 @@ set_removed(Node, Vsn) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+
+change_vsn_and_clear(Node, Vsn, FromVsn) ->
+    do([error_m ||
+           make_permenant(Node, FromVsn),
+           set_removed(Node, Vsn)
+       ]).
