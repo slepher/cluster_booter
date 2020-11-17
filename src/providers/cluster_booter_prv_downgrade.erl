@@ -117,7 +117,7 @@ downgrade_change(NodeName, Vsn, FromVsn, State) ->
                 {error, Reason} ->
                     {error, Reason}
             end;
-        {ok, Vsn} ->
+        {ok, FromVsn} ->
             case change_vsn_and_clear(Node, Vsn, FromVsn) of
                 ok ->
                     io:format("~p already installed new release ~s~n", [NodeName, Vsn]),
