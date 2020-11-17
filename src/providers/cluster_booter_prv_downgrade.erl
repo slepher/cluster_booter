@@ -10,6 +10,8 @@
 
 -export([init/1, do/1, format_error/1]).
 
+-include_lib("erlando/include/do.hrl").
+
 %% API
 -define(PROVIDER, downgrade).
 -define(DEPS, []).
@@ -162,7 +164,6 @@ set_removed(Node, Vsn) ->
         {error, Reason} ->
             {error, Reason}
     end.
-
 
 change_vsn_and_clear(Node, Vsn, FromVsn) ->
     do([error_m ||
