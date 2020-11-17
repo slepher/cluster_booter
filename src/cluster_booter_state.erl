@@ -116,6 +116,7 @@ initialize(State) ->
                  cluster_booter_prv_start_nodes,
                  cluster_booter_prv_initialize,
                  cluster_booter_prv_upgrade,
+                 cluster_booter_prv_downgrade,
                  cluster_booter_prv_versions,
                  cluster_booter_prv_config,
                  cluster_booter_prv_stop_nodes
