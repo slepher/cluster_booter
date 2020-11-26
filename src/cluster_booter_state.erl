@@ -287,7 +287,7 @@ load_term({data, Data}, State) ->
     NState = data(State, Data),
     {ok, NState};
 load_term({groups, Groups}, State) ->
-    Groups1 = string:split(Groups, "+"),
+    Groups1 = string:split(Groups, "+", all),
     Groups2 = lists:map(fun(Group) -> list_to_atom(Group) end, Groups1),
     State1 = cluster_booter_state:groups(State, Groups2),
     {ok, State1};
