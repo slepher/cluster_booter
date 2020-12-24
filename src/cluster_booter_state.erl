@@ -134,7 +134,7 @@ initialize(State) ->
 load_cluster(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
     PackagesPath = cluster_booter_state:packages_path(State),
-    ClusterFile = filename:join(PackagesPath, "releases", atom_to_list(AllInOne) ++ ".clus"),
+    ClusterFile = filename:join([PackagesPath, atom_to_list(AllInOne) ++ ".clus"]),
     case file:consult(ClusterFile) of
         {ok, [{cluster, ClusterName, ClusterVersion, Releases, Applications}]} ->
             {ReleaseMap, MainAppMap} = 

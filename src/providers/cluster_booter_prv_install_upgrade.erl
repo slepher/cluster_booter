@@ -56,10 +56,10 @@ install_packages(AllInOne, State) ->
     Packages = cluster_booter_state:upgrade_packages(State),
     PackagesPath = cluster_booter_state:packages_path(State),
     io:format("packages path is ~s~n", [PackagesPath]),
-    case get_upgrade_clients(PackagesPath) of
-        {ok, ChangeClients} ->
-            case extract_package(AllInOne, PackagesPath, Packages) of
-                ok ->
+    case extract_package(AllInOne, PackagesPath, Packages) of
+        ok ->
+            case get_upgrade_clients(PackagesPath) of
+                {ok, ChangeClients} ->
                     Result = 
                         maps:fold(
                           fun(Host, Nodes, ok) ->
@@ -100,7 +100,9 @@ extract_package(AllInOne, PackagesPath, Packages) ->
                             io:format("file is ~s~n", [File]),
                             Result = erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]),
                             io:format("result is ~p~n", [Result]),
-                            file:copy(filename:join(TargetDirectory, "clusup"), filename:join(PackagesPath, "clusup")),
+                            FromFile = filename:join([TargetDirectory, "clusup"]),
+                            ToFile = filename:join([PackagesPath, "clusup"]),
+                            file:copy(FromFile, ToFile),
                             Result;
                         {error, Reason} ->
                             {error, Reason}
