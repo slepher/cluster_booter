@@ -100,6 +100,7 @@ extract_package(AllInOne, PackagesPath, Packages) ->
                             io:format("file is ~s~n", [File]),
                             Result = erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]),
                             io:format("result is ~p~n", [Result]),
+                            file:copy(filename:join(TargetDirectory, "clusup"), filename:join(PackagesPath, "clusup")),
                             Result;
                         {error, Reason} ->
                             {error, Reason}
