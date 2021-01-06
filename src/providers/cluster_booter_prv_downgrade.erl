@@ -30,13 +30,20 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    PackagesPath = cluster_booter_state:packages_path(State),
-    ClusupPath = filename:join([PackagesPath, "clusup"]),
-    case file:consult(ClusupPath) of
-        {ok,[{clusup, ClusterName, Changes}]} ->
-            downgrade_changes(ClusterName, Changes, State);
-        {ok, [{clusup, ClusterName, Changes, _Extra}]} ->
-            downgrade_changes(ClusterName, Changes, State);
+    Cwd = file:get_cwd(),
+    AllInOne = cluster_booter_state:all_in_one(State),
+    ClusBasename = atom_to_list(AllInOne) ++ ".clusup",
+    ClusupPath = filename:join([Cwd, "release", ClusBasename]),
+    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
+        {ok,[{clusup, ClusterName, _UpVsn, DownVsn, Changes}]} ->
+            case downgrade_changes(ClusterName, Changes, State) of
+                {ok, State1} ->
+                    State2 = cluster_booter_state:version(State1, DownVsn),
+                    cluster_booter_file_lib:copy_clusfile(State2),
+                    {ok, State2};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.
@@ -56,7 +63,7 @@ format_error({application_not_started, Result}) ->
 
 %%%===================================================================
 %%% Internal functions
-%%%=================================================================== 
+%%%===================================================================
 downgrade_changes(ClusterName, [{change, NodeName, Vsn, FromVsn}|T], State) ->
     io:format("downgrade ~p from ~s to ~s ~n", [NodeName, Vsn, FromVsn]),
     case downgrade_change(NodeName, Vsn, FromVsn, State) of

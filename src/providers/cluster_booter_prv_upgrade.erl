@@ -28,20 +28,22 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    PackagesPath = cluster_booter_state:packages_path(State),
-    ClusupPath = filename:join([PackagesPath, "clusup"]),
-    case file:consult(ClusupPath) of
-        {ok,[{clusup, ClusterName, Changes}]} ->
+    Cwd = file:get_cwd(),
+    AllInOne = cluster_booter_state:all_in_one(State),
+    ClusupName = AllInOne ++ ".clusup",
+    ClusupPath = filename:join([Cwd, ClusupName]),
+    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
+        {ok, [{clusup, ClusterName, UpVsn, _DownVsn, Changes, _Extra}]} ->
             case upgrade_changes(ClusterName, Changes, State) of
                 {ok, State1} ->
-                    make_permenants(ClusterName, Changes, State1);
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {ok, [{clusup, ClusterName, Changes, _Extra}]} ->
-            case upgrade_changes(ClusterName, Changes, State) of
-                {ok, State1} ->
-                    make_permenants(ClusterName, Changes, State1);
+                    case make_permenants(ClusterName, Changes, State1) of
+                        {ok, State2} ->
+                            State3 = cluster_booter_state:version(State2, UpVsn),
+                            cluster_booter_file_lib:copy_clusfile(State3),
+                            {ok, State3};
+                        {error, Reason} ->
+                            {error, Reason}
+                    end;
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -64,7 +66,7 @@ format_error({application_not_started, Result}) ->
 
 %%%===================================================================
 %%% Internal functions
-%%%=================================================================== 
+%%%===================================================================
 upgrade_changes(ClusterName, [{change, NodeName, Vsn, FromVsn}|T], State) ->
     io:format("upgrade ~p from ~s to ~s ~n", [NodeName, FromVsn, Vsn]),
     case upgrade_change(NodeName, Vsn, FromVsn, State) of

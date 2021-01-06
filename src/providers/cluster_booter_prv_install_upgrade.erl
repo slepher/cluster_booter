@@ -58,7 +58,7 @@ install_packages(AllInOne, State) ->
     io:format("packages path is ~s~n", [PackagesPath]),
     case extract_package(AllInOne, PackagesPath, Packages) of
         ok ->
-            case get_upgrade_clients(PackagesPath) of
+            case get_upgrade_clients(State) of
                 {ok, ChangeClients} ->
                     Result = 
                         maps:fold(
@@ -88,6 +88,7 @@ install_packages(AllInOne, State) ->
     end.
 
 extract_package(AllInOne, PackagesPath, Packages) ->
+    Cwd = file:get_cwd(),
     TargetDirectory = filename:join([PackagesPath, AllInOne]),
     case filelib:is_dir(TargetDirectory) of
         false ->
@@ -97,13 +98,23 @@ extract_package(AllInOne, PackagesPath, Packages) ->
                         {ok, FromVersion} ->
                             File = filename:join([PackagesPath, atom_to_list(AllInOne) ++ 
                                                       "_" ++ FromVersion ++ "-" ++ Version ++ ".tar.gz"]),
-                            io:format("file is ~s~n", [File]),
-                            Result = erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]),
-                            io:format("result is ~p~n", [Result]),
-                            FromFile = filename:join([TargetDirectory, "clusup"]),
-                            ToFile = filename:join([PackagesPath, "clusup"]),
-                            file:copy(FromFile, ToFile),
-                            Result;
+                            case erl_tar:extract(File, [{cwd, TargetDirectory}, compressed]) of
+                                ok ->
+                                    ClusBasename = atom_to_list(AllInOne) ++ ".clus",
+                                    ClusupBaseName = atom_to_list(AllInOne) ++ ".clusup",
+                                    file:make_dir(filename:join([Cwd, "releases", Version])),
+                                    ClusFrom = filename:join([TargetDirectory, "releases", Version, ClusBasename]),
+                                    ClusTo = filename:join([Cwd, "releases", Version, ClusBasename]),
+                                    ClusupFrom = filename:join([TargetDirectory, "releases", Version, ClusupBaseName]),
+                                    ClusupTo = filename:join([Cwd, "releases", Version, ClusupBaseName]),
+                                    ClusupTo2 = filename:join([Cwd, "releases", ClusupBaseName]),
+                                    file:copy(ClusFrom, ClusTo),
+                                    file:copy(ClusupFrom, ClusupTo),
+                                    file:copy(ClusupFrom, ClusupTo2),
+                                    ok;
+                                {error, Reason} ->
+                                    {error, Reason}
+                            end;
                         {error, Reason} ->
                             {error, Reason}
                     end;
@@ -186,13 +197,13 @@ clusup_clients(Changes) ->
               Acc
       end, maps:new(), Changes).
     
-get_upgrade_clients(PackagesPath) ->
-    ClusupPath = filename:join([PackagesPath, "clusup"]),
-    case file:consult(ClusupPath) of
-        {ok,[{clusup, _ClusterName, Changes}]} ->
-            ChangeClients = clusup_clients(Changes),
-            {ok, ChangeClients};
-        {ok, [{clusup, _ClusterName, Changes, _Extra}]} ->
+get_upgrade_clients(State) ->
+    Cwd = file:get_cwd(),
+    AllInOne = cluster_booter_state:all_in_one(State),
+    ClusupName = atom_to_list(AllInOne) ++ ".clusup",
+    ClusupPath = filename:join([Cwd, "releases", ClusupName]),
+    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
+        {ok,[{clusup, _ClusterName, _UpToVsn, _UpFromVsn, Changes, _Extra}]} ->
             ChangeClients = clusup_clients(Changes),
             {ok, ChangeClients};
         {error, Reason} ->
