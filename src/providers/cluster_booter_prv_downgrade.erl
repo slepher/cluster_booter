@@ -30,13 +30,13 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    Cwd = file:get_cwd(),
+    {ok, Cwd} = file:get_cwd(),
     AllInOne = cluster_booter_state:all_in_one(State),
     ClusBasename = atom_to_list(AllInOne) ++ ".clusup",
-    ClusupPath = filename:join([Cwd, "release", ClusBasename]),
+    ClusupPath = filename:join([Cwd, "releases", ClusBasename]),
     case cluster_booter_file_lib:consult_clusup(ClusupPath) of
-        {ok,[{clusup, ClusterName, _UpVsn, DownVsn, Changes}]} ->
-            case downgrade_changes(ClusterName, Changes, State) of
+        {ok, {clusup, ClusterName, _UpVsn, DownVsn, ReleaseChanges, _AppChanges, _Extra}} ->
+            case downgrade_changes(ClusterName, ReleaseChanges, State) of
                 {ok, State1} ->
                     State2 = cluster_booter_state:version(State1, DownVsn),
                     cluster_booter_file_lib:copy_clusfile(State2),

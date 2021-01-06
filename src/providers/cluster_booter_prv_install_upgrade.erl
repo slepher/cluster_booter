@@ -88,7 +88,7 @@ install_packages(AllInOne, State) ->
     end.
 
 extract_package(AllInOne, PackagesPath, Packages) ->
-    Cwd = file:get_cwd(),
+    {ok, Cwd} = file:get_cwd(),
     TargetDirectory = filename:join([PackagesPath, AllInOne]),
     case filelib:is_dir(TargetDirectory) of
         false ->
@@ -132,7 +132,7 @@ get_latest_version(Release, Packages) ->
             Version = lists:max(Versions),
             {ok, Version};
         error ->
-            {error, no_usabe_packages}
+            {error, no_usable_packages}
     end.
 
 get_latest_upgrade_version(Release, Packages, To) ->
@@ -147,7 +147,7 @@ get_latest_upgrade_version(Release, Packages, To) ->
                     {error, no_usable_packages}
             end;
         error ->
-            {error, no_usabe_packages}
+            {error, no_usable_packages}
     end.
 
 sync_root_dir(Root, Opts, AllInOne, PackagesPath) ->
@@ -198,13 +198,13 @@ clusup_clients(Changes) ->
       end, maps:new(), Changes).
     
 get_upgrade_clients(State) ->
-    Cwd = file:get_cwd(),
+    {ok, Cwd} = file:get_cwd(),
     AllInOne = cluster_booter_state:all_in_one(State),
     ClusupName = atom_to_list(AllInOne) ++ ".clusup",
     ClusupPath = filename:join([Cwd, "releases", ClusupName]),
     case cluster_booter_file_lib:consult_clusup(ClusupPath) of
-        {ok,[{clusup, _ClusterName, _UpToVsn, _UpFromVsn, Changes, _Extra}]} ->
-            ChangeClients = clusup_clients(Changes),
+        {ok, {clusup, _ClusterName, _UpToVsn, _UpFromVsn, ReleaseChanges, _AppChanges, _Extra}} ->
+            ChangeClients = clusup_clients(ReleaseChanges),
             {ok, ChangeClients};
         {error, Reason} ->
             {error, Reason}

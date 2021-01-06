@@ -12,7 +12,6 @@
 -export([init/1,
          do/1,
          format_error/1]).
--export([packages/1]).
 
 -define(PROVIDER, packages).
 -define(DEPS, []).
@@ -28,8 +27,11 @@ init(State) ->
     {ok, NState}.
 
 do(State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
+    Root = cluster_booter_state:root(State),
     PackagePath = cluster_booter_state:packages_path(State),
-    {Packages, UpgradePackages} = packages(PackagePath),
+    NeedInstall = Root =/= PackagePath,
+    {Packages, UpgradePackages} = packages(AllInOne, PackagePath, NeedInstall),
     format_packages(Packages),
     format_upgrade_packages(UpgradePackages),
     State1 = cluster_booter_state:packages(State, Packages),
@@ -43,7 +45,7 @@ format_error(Reason) ->
 %%%===================================================================
 %%% API
 %%%===================================================================
-packages(PackagePath) ->
+packages(_Release, PackagePath, true) ->
     Files = filelib:wildcard("*.tar.gz", PackagePath),
     lists:foldl(
       fun(Filename, {PAcc, UAcc} = Acc) ->
@@ -68,7 +70,22 @@ packages(PackagePath) ->
                   _ ->
                       Acc
               end
-      end, {maps:new(), maps:new()}, Files).
+      end, {maps:new(), maps:new()}, Files);
+packages(Release, PackagePath, false) ->
+    Dirname = filename:join([PackagePath, "releases"]),
+    {ok, Files} = file:list_dir(Dirname),
+    Packages = 
+        lists:foldl(
+          fun(Basename, Acc) ->
+                  Filename = filename:join([Dirname, Basename]),
+                  case filelib:is_dir(Filename) of
+                      true ->
+                          maps:put(Basename, Filename, Acc);
+                      false ->
+                          Acc
+                  end
+          end, maps:new(), Files),
+    {maps:put(Release, Packages, maps:new()), maps:new()}.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -86,7 +103,6 @@ format_packages(Packages) ->
               io:format("~p:~s~n", [Package, string:join(lists:usort(Versions), ",")]),
               ok
       end, ok, Packages).
-                  
                         
 format_upgrade_packages(Packages) ->
     maps:fold(

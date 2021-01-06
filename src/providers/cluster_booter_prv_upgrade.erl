@@ -28,15 +28,15 @@ init(State) ->
     {ok, State1}.
 
 do(State) ->
-    Cwd = file:get_cwd(),
+    {ok, Cwd} = file:get_cwd(),
     AllInOne = cluster_booter_state:all_in_one(State),
-    ClusupName = AllInOne ++ ".clusup",
-    ClusupPath = filename:join([Cwd, ClusupName]),
+    ClusupName = atom_to_list(AllInOne) ++ ".clusup",
+    ClusupPath = filename:join([Cwd, "releases", ClusupName]),
     case cluster_booter_file_lib:consult_clusup(ClusupPath) of
-        {ok, [{clusup, ClusterName, UpVsn, _DownVsn, Changes, _Extra}]} ->
-            case upgrade_changes(ClusterName, Changes, State) of
+        {ok, {clusup, ClusterName, UpVsn, _DownVsn, ReleaseChanges, _AppChanges, _Extra}} ->
+            case upgrade_changes(ClusterName, ReleaseChanges, State) of
                 {ok, State1} ->
-                    case make_permenants(ClusterName, Changes, State1) of
+                    case make_permenants(ClusterName, ReleaseChanges, State1) of
                         {ok, State2} ->
                             State3 = cluster_booter_state:version(State2, UpVsn),
                             cluster_booter_file_lib:copy_clusfile(State3),

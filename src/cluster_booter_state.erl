@@ -14,7 +14,7 @@
 -export([new/0]).
 -export([validate/1, transform/1]).
 -export([create_all_providers/2]).
--export([load_terms/2, load_cluster/1]).
+-export([load_terms/2, load_cluster/2]).
 -export([initialize/1]).
 -export([get_env/2, get_env/3, get_node/2]).
 -export([add_provider/2, add_to_provider_hooks/3]).
@@ -119,7 +119,8 @@ initialize(State) ->
                  cluster_booter_prv_downgrade,
                  cluster_booter_prv_versions,
                  cluster_booter_prv_config,
-                 cluster_booter_prv_stop_nodes
+                 cluster_booter_prv_stop_nodes,
+                 cluster_booter_prv_force_install
                 ];
             _ ->
                 InitProviders
@@ -131,10 +132,9 @@ initialize(State) ->
             {error, Reason}
     end.
 
-load_cluster(State) ->
+load_cluster(State, Force) ->
     AllInOne = cluster_booter_state:all_in_one(State),
-    PackagesPath = cluster_booter_state:packages_path(State),
-    ClusterFile = filename:join([PackagesPath, atom_to_list(AllInOne) ++ ".clus"]),
+    ClusterFile = filename:join(["releases", atom_to_list(AllInOne) ++ ".clus"]),
     case file:consult(ClusterFile) of
         {ok, [{cluster, ClusterName, ClusterVersion, Releases, Applications}]} ->
             {ReleaseMap, MainAppMap} = 
@@ -156,7 +156,12 @@ load_cluster(State) ->
             State = cluster_booter_state:applications(State, ApplicationMap),
             {ok, State};
         {error, enoent} ->
-            {error, {load_cluster_file_failed, ClusterFile}};
+            case Force of
+                true ->
+                    {error, {load_cluster_file_failed, ClusterFile}};
+                false ->
+                    {ok, State}
+            end;
         {error, Reason} ->
             {error, Reason}
     end.

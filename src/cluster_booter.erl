@@ -46,7 +46,7 @@ init_state(Options) ->
            NConfig = cluster_booter_config_base:merge_configs(Config, DefaultConfig),
            State1 <- cluster_booter_state:load_terms(NConfig, State),
            State2 <- cluster_booter_state:transform(State1),
-           State3 <- cluster_booter_state:load_cluster(State2),
+           State3 <- cluster_booter_state:load_cluster(State2, false),
            cluster_booter_state:validate(State3),
            cluster_booter_state:initialize(State3)
        ]).

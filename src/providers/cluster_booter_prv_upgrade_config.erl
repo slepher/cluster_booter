@@ -60,11 +60,12 @@ upgrade_versions(Changes) ->
       end, maps:new(), Changes).
 
 upgrade_changes(State) ->
-    PackagesPath = cluster_booter_state:packages_path(State),
-    ClusupPath = filename:join([PackagesPath, "clusup"]),
-    case file:consult(ClusupPath) of
-        {ok,[{clusup, _ClusterName, Changes}]} ->
-            {ok, Changes};
+    {ok, Cwd} = file:get_cwd(),
+    AllInOne = cluster_booter_state:all_in_one(State),
+    ClusupPath = filename:join([Cwd, "releases", atom_to_list(AllInOne) ++ ".clusup"]),
+    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
+        {ok,{clusup, _ClusterName, _UpToVsn, _UpFromVsn, ReleaseChanges, _AppChanges, _Extra}} ->
+            {ok, ReleaseChanges};
         {ok, [{clusup, _ClusterName, Changes, _Extra}]} ->
             {ok, Changes};
         {error, Reason} ->
