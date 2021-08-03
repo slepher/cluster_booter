@@ -37,12 +37,12 @@ do(State) ->
     do([error_m ||
            {clusup, ClusterName, UpVsn, _DownVsn, ReleaseChanges, _AppChanges, Extra} <-
                cluster_booter_file_lib:consult_clusup(ClusupPath),
-           monad_error:trans_error(pre_upgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end),
+           monad_error:trans_error(pre_upgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end, error_m),
            State1 <- upgrade_changes(ClusterName, ReleaseChanges, State),
            State2 <- make_permenants(ClusterName, ReleaseChanges, State1),
            State3 = cluster_booter_state:version(State2, UpVsn),
            cluster_booter_file_lib:copy_clusfile(State3),
-           monad_error:trans_error(post_upgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end),
+           monad_error:trans_error(post_upgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end, error_m),
            return(State3)
        ]).
 
