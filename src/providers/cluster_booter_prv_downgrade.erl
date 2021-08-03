@@ -34,19 +34,16 @@ do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
     ClusBasename = atom_to_list(AllInOne) ++ ".clusup",
     ClusupPath = filename:join([Cwd, "releases", ClusBasename]),
-    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
-        {ok, {clusup, ClusterName, _UpVsn, DownVsn, ReleaseChanges, _AppChanges, _Extra}} ->
-            case downgrade_changes(ClusterName, ReleaseChanges, State) of
-                {ok, State1} ->
-                    State2 = cluster_booter_state:version(State1, DownVsn),
-                    cluster_booter_file_lib:copy_clusfile(State2),
-                    {ok, State2};
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    do([error_m ||
+           {clusup, ClusterName, _UpVsn, DownVsn, ReleaseChanges, _AppChanges, Extra} <-
+               cluster_booter_file_lib:consult_clusup(ClusupPath),
+           monad_error:trans_error(pre_downgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end, error_m),
+           State1 <- downgrade_changes(ClusterName, ReleaseChanges, State),
+           monad_error:trans_error(post_downgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end, error_m),
+           State2 = cluster_booter_state:version(State1, DownVsn),
+           cluster_booter_file_lib:copy_clusfile(State2),
+           return(State2)
+       ]).
 
 format_error({application_not_started, Result}) ->
     io_lib:format("application start failed ~p", [Result]).
@@ -138,6 +135,32 @@ make_permenant(Node, Vsn) ->
             ok;
         {error, Reason} ->
             {error, Reason}
+    end.
+
+pre_downgrade(Extra, State) ->
+    case proplists:get_value(pre_downgrade, Extra) of
+        undefined ->
+            ok;
+        Scripts ->
+            traversal:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts)
+    end.
+
+post_downgrade(Extra, State) ->
+    case proplists:get_value(post_downgrade, Extra, []) of
+        [] ->
+            ok;
+        Scripts ->
+            traversal:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts)
+    end.
+
+apply_downgrade_script({NodeName, {M, F, A}}, State) ->
+    Node = cluster_booter_state:get_node(NodeName, State),
+    io:format("call to ~p ~p ~p ~p~n", [NodeName, M, F, A]),
+    case rpc:call(Node, M, F, A) of
+        ok ->
+            ok;
+        Other ->
+            {error, {upgrade_failed, NodeName, M, F, A, Other}}
     end.
 
 set_removed(Node, Vsn, Releases) ->

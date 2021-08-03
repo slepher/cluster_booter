@@ -37,12 +37,12 @@ do(State) ->
     do([error_m ||
            {clusup, ClusterName, UpVsn, _DownVsn, ReleaseChanges, _AppChanges, Extra} <-
                cluster_booter_file_lib:consult_clusup(ClusupPath),
-           moand_error:trans_error(pre_upgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end),
+           monad_error:trans_error(pre_upgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end),
            State1 <- upgrade_changes(ClusterName, ReleaseChanges, State),
            State2 <- make_permenants(ClusterName, ReleaseChanges, State1),
            State3 = cluster_booter_state:version(State2, UpVsn),
            cluster_booter_file_lib:copy_clusfile(State3),
-           moand_error:trans_error(post_upgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end),
+           monad_error:trans_error(post_upgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end),
            return(State3)
        ]).
 
@@ -108,15 +108,15 @@ pre_upgrade(Extra, State) ->
         undefined ->
             ok;
         Scripts ->
-            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts)
+            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
     end.
 
 post_upgrade(Extra, State) ->
-    case proplists:get_value(pre_upgrade, Extra, []) of
+    case proplists:get_value(post_upgrade, Extra, []) of
         [] ->
             ok;
         Scripts ->
-            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts)
+            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
     end.
 
 apply_upgrade_script({NodeName, {M, F, A}}, State) ->
