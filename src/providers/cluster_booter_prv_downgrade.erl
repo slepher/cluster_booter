@@ -142,7 +142,7 @@ pre_downgrade(Extra, State) ->
         undefined ->
             ok;
         Scripts ->
-            traversal:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts)
+            traversable:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts, list)
     end.
 
 post_downgrade(Extra, State) ->
@@ -150,7 +150,7 @@ post_downgrade(Extra, State) ->
         [] ->
             ok;
         Scripts ->
-            traversal:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts)
+            traversable:traverse(fun(Script) -> apply_downgrade_script(Script, State) end, Scripts, list)
     end.
 
 apply_downgrade_script({NodeName, {M, F, A}}, State) ->
