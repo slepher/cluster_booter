@@ -108,7 +108,7 @@ pre_upgrade(Extra, State) ->
         undefined ->
             ok;
         Scripts ->
-            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
+            traversable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
     end.
 
 post_upgrade(Extra, State) ->
@@ -116,7 +116,7 @@ post_upgrade(Extra, State) ->
         [] ->
             ok;
         Scripts ->
-            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
+            traversable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts, list)
     end.
 
 apply_upgrade_script({NodeName, {M, F, A}}, State) ->
