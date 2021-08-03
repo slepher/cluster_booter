@@ -10,6 +10,8 @@
 
 -export([init/1, do/1, format_error/1]).
 
+-include_lib("erlando/include/do.hrl").
+
 %% API
 -define(PROVIDER, upgrade).
 -define(DEPS, [upgrade_config]).
@@ -32,24 +34,17 @@ do(State) ->
     AllInOne = cluster_booter_state:all_in_one(State),
     ClusupName = atom_to_list(AllInOne) ++ ".clusup",
     ClusupPath = filename:join([Cwd, "releases", ClusupName]),
-    case cluster_booter_file_lib:consult_clusup(ClusupPath) of
-        {ok, {clusup, ClusterName, UpVsn, _DownVsn, ReleaseChanges, _AppChanges, _Extra}} ->
-            case upgrade_changes(ClusterName, ReleaseChanges, State) of
-                {ok, State1} ->
-                    case make_permenants(ClusterName, ReleaseChanges, State1) of
-                        {ok, State2} ->
-                            State3 = cluster_booter_state:version(State2, UpVsn),
-                            cluster_booter_file_lib:copy_clusfile(State3),
-                            {ok, State3};
-                        {error, Reason} ->
-                            {error, Reason}
-                    end;
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    do([error_m ||
+           {clusup, ClusterName, UpVsn, _DownVsn, ReleaseChanges, _AppChanges, Extra} <-
+               cluster_booter_file_lib:consult_clusup(ClusupPath),
+           moand_error:trans_error(pre_upgrade(Extra, State), fun(Reason) -> {pre_upgrade_failed, Reason} end),
+           State1 <- upgrade_changes(ClusterName, ReleaseChanges, State),
+           State2 <- make_permenants(ClusterName, ReleaseChanges, State1),
+           State3 = cluster_booter_state:version(State2, UpVsn),
+           cluster_booter_file_lib:copy_clusfile(State3),
+           moand_error:trans_error(post_upgrade(Extra, State), fun(Reason) -> {post_upgrade_failed, Reason} end),
+           return(State3)
+       ]).
 
 format_error({application_not_started, Result}) ->
     io_lib:format("application start failed ~p", [Result]).
@@ -107,6 +102,32 @@ make_permenants(ClusterName, [_Other|T], State) ->
     make_permenants(ClusterName, T, State);
 make_permenants(_ClusterName, [], State) ->
     {ok, State}.
+
+pre_upgrade(Extra, State) ->
+    case proplists:get_value(pre_upgrade, Extra) of
+        undefined ->
+            ok;
+        Scripts ->
+            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts)
+    end.
+
+post_upgrade(Extra, State) ->
+    case proplists:get_value(pre_upgrade, Extra, []) of
+        [] ->
+            ok;
+        Scripts ->
+            traverable:traverse(fun(Script) -> apply_upgrade_script(Script, State) end, Scripts)
+    end.
+
+apply_upgrade_script({NodeName, {M, F, A}}, State) ->
+    Node = cluster_booter_state:get_node(NodeName, State),
+    io:format("call to ~p ~p ~p ~p~n", [NodeName, M, F, A]),
+    case rpc:call(Node, M, F, A) of
+        ok ->
+            ok;
+        Other ->
+            {error, {upgrade_failed, NodeName, M, F, A, Other}}
+    end.
 
 upgrade_change(NodeName, Vsn, _FromVsn, State) ->
     Node = cluster_booter_state:get_node(NodeName, State),
