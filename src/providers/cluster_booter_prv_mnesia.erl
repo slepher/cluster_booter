@@ -70,9 +70,11 @@ import_from_dump_if(State) ->
         "" ->
             {ok, State};
         DumpFile ->
-            case file:consult(DumpFile) of
-                {ok, DumpData} ->
-                    Groups = proplists:get_value(groups, DumpData, []),
+            io:format("import data from dumpfile ~s~n", [DumpFile]),
+            case file:read_file(DumpFile) of
+                {ok, B} ->
+                    {dump_data, Groups, DumpData} = binary_to_term(B),
+                    io:format("import data from dumpfile ~s imported ~n", [DumpFile]),
                     State1 = cluster_booter_state:imported_groups(State, Groups),
                     init_nodes(DumpData, State1);
                 {error, Reason} ->
@@ -82,8 +84,6 @@ import_from_dump_if(State) ->
 
 init_nodes([], State) ->
     {ok, State};
-init_nodes([{groups, _}|T], State) ->
-    init_nodes(T, State);
 init_nodes([{NodeName, DumpData}|T], State) ->
     MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
     case maps:find(NodeName, MnesiaNodeMap) of
