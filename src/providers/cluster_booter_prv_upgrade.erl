@@ -147,7 +147,10 @@ upgrade_change(NodeName, Vsn, _FromVsn, State) ->
             {error, Reason}
     end.
 
-upgrade_add(_NodeName, _Vsn, State) ->
+upgrade_add(NodeName, State) ->
+    start_node(NodeName, State),
+    start_mnesia(NodeName, State),
+    start_app(NodeName, State),
     {ok, State}.
 
 upgrade_remove(_NodeName, _Vsn, State) ->
@@ -177,4 +180,77 @@ install_release(Node, Vsn) ->
             {ok, Vsn};
         {error, Reason} ->
             {error, Reason}
+    end.
+
+start_node(Name, State) ->
+    AllInOne = cluster_booter_state:all_in_one(State),
+    BaseDir = cluster_booter_state:root(State),
+    Nodes = cluster_booter_state:nodes(State),
+    NodeMap = cluster_booter_state:node_map(State),
+    Status = cluster_booter_node:check(Nodes, NodeMap),
+    Releases = cluster_booter_state:releases(State),
+    cluster_booter_state:fold_host_nodes(
+      fun(Host, Release, NodeName, ok) ->
+              case NodeName == Name of
+                  true ->
+                      Node = maps:get(NodeName, NodeMap),
+                      case cluster_booter_state:installed(Host, Release, State) of
+                          true ->
+                              case cluster_booter_node:started(NodeName, Status) of
+                                  false ->
+                                      case maps:find(Release, Releases) of
+                                          {ok, ReleaseVsn} ->
+                                              CmdOpt = cluster_booter_state:cmd_opt(Host, State),
+                                              CmdArg = [{node_name, NodeName}, {cluster_name, AllInOne},
+                                                        {base_dir, BaseDir}, {vsn, ReleaseVsn}],
+                                              Cmd = cluster_booter_cmd:cmd(start_boot, CmdArg, CmdOpt),
+                                              io:format("cmd is ~s~n", [Cmd]),
+                                              os:cmd(Cmd),
+                                              cluster_booter_node:wait_node(Node, 5000),
+                                      io:format("start ~p at ~s~n", [Release, Host]);
+                                          error ->
+                                              io:format("no release vsn of ~p", [Release])
+                                      end;
+                                  true ->
+                                      ok
+                              end;
+                          false ->
+                              io:format("release ~p is not installed at ~s~n", [Release, Host])
+                      end;
+                  false ->
+                      ok
+              end
+      end, ok, State).
+
+start_mnesia(NodeName, State) ->
+    SchemaModule = cluster_booter_state:mnesia_schema(State),
+    MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
+    NodeMap = cluster_booter_state:node_map(State),
+    case maps:find(NodeName, MnesiaNodeMap) of
+        {ok, MnesiaNodes} ->
+            case cluster_booter_mnesia:initialize(MnesiaNodes, NodeMap, SchemaModule) of
+                ok ->
+                    {ok, State};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+start_app(NodeName, State) ->
+    ReleaseNodesMap = cluster_booter_state:release_nodes_map(State),
+    MainApplications = cluster_booter_state:main_applications(State),
+    Applications = maps:get(NodeName, MainApplications, []),
+    case maps:find(NodeName, ReleaseNodesMap) of
+        {ok, Nodes} ->
+            lists:foreach(
+              fun(Node, Acc) ->
+                      lists:foreach(
+                        fun(Application) ->
+                                cluster_booter_application:boot_application(Node, Application, NodeMap)
+                        end)
+              end, Nodes);
+        error ->
+            io:format("could not find node ~p~n", [NodeName])
     end.
