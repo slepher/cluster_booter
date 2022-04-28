@@ -55,7 +55,7 @@ upgrade_versions(Changes) ->
               maps:put(NodeName, Vsn, Acc);
          ({add, NodeName, Vsn}, Acc) ->
               maps:put(NodeName, Vsn, Acc);
-         ({remove, _NodeName, _Vsn}, Acc) ->
+         ({del, _NodeName, _Vsn}, Acc) ->
               Acc
       end, maps:new(), Changes).
 
