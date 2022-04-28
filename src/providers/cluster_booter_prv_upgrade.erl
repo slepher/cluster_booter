@@ -78,7 +78,7 @@ upgrade_changes(ClusterName, [{add, NodeName, Vsn}|T], State) ->
         {error, Reason} ->
             {error, Reason}
     end;
-upgrade_changes(ClusterName, [{remove, NodeName, Vsn}|T], State) ->
+upgrade_changes(ClusterName, [{del, NodeName, Vsn}|T], State) ->
     io:format("stop node ~p of ~s ~n", [NodeName, Vsn]),
     case upgrade_remove(NodeName, Vsn, State) of
         {ok, State1} ->
@@ -147,10 +147,8 @@ upgrade_change(NodeName, Vsn, _FromVsn, State) ->
             {error, Reason}
     end.
 
-upgrade_add(NodeName, State) ->
-    start_node(NodeName, State),
-    start_mnesia(NodeName, State),
-    start_app(NodeName, State),
+upgrade_add(NodeName, Vsn, State) ->
+    io:format("you should start ~p manually~n", [NodeName]),
     {ok, State}.
 
 upgrade_remove(_NodeName, _Vsn, State) ->
@@ -222,25 +220,11 @@ start_node(Name, State) ->
               end
       end, ok, State).
 
-start_mnesia(NodeName, State) ->
-    SchemaModule = cluster_booter_state:mnesia_schema(State),
-    MnesiaNodeMap = cluster_booter_state:mnesia_nodes(State),
-    NodeMap = cluster_booter_state:node_map(State),
-    case maps:find(NodeName, MnesiaNodeMap) of
-        {ok, MnesiaNodes} ->
-            case cluster_booter_mnesia:initialize(MnesiaNodes, NodeMap, SchemaModule) of
-                ok ->
-                    {ok, State};
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
 
 start_app(NodeName, State) ->
     ReleaseNodesMap = cluster_booter_state:release_nodes_map(State),
     MainApplications = cluster_booter_state:main_applications(State),
+    NodeMap = cluster_booter_state:node_map(State),
     Applications = maps:get(NodeName, MainApplications, []),
     case maps:find(NodeName, ReleaseNodesMap) of
         {ok, Nodes} ->
@@ -248,6 +232,9 @@ start_app(NodeName, State) ->
               fun(Node, Acc) ->
                       lists:foreach(
                         fun(Application) ->
+                                NodeHost = maps:get(Node, NodeMap),
+                                cluster_booter_application:boot_application(Node, [mnesia], NodeMap),
+                                rpc:call(NodeHost, list_to_atom(lists:flatten(io_lib:format("~p_appup", [Node]), boot, []))),
                                 cluster_booter_application:boot_application(Node, Application, NodeMap)
                         end)
               end, Nodes);

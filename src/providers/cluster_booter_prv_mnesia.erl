@@ -114,7 +114,6 @@ init_tables(MasterNode, [{Table, Datas}|T]) ->
             {error, {import_table_data_failed, Table, Reason}}
     end.
 
-
 init_datas(MasterNode, Table, Datas) ->
     io:format("write records ~p~n", [Table]),
     F = rpc_function:transform(

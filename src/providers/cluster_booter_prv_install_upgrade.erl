@@ -170,11 +170,11 @@ sync_client_dir(Root, Node, Opts, Clients, PackagesPath, AllInOne) ->
     case maps:find(Node, Clients) of
         {ok, Vsn} ->
             FromPath = filename:join([PackagesPath, AllInOne]),
-            From = filename:join([FromPath, "clients", Node, "releases"]) ++ "/",
-            FromVsn = filename:join([From, Vsn]),
+            From = filename:join([FromPath, "clients", Node]) ++ "/",
+            FromVsn = filename:join([From, "releases", Vsn]),
             case filelib:is_dir(FromVsn) of
                 true ->
-                    To = filename:join([Root, "clients", Node, "releases"]) ++ "/",
+                    To = filename:join([Root, "clients", Node]) ++ "/",
                     Cmd2 = cluster_booter_cmd:cmd(mkdir, [{dir, To}], Opts),
                     os:cmd(Cmd2),
                     Cmd3 = cluster_booter_cmd:cmd({rsync, From, To, ""}, Opts),
