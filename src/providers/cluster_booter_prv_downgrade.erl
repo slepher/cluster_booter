@@ -77,7 +77,7 @@ downgrade_changes(ClusterName, [{add, NodeName, Vsn}|T], State) ->
         {error, Reason} ->
             {error, Reason}
     end;
-downgrade_changes(ClusterName, [{remove, NodeName, Vsn}|T], State) ->
+downgrade_changes(ClusterName, [{del, NodeName, Vsn}|T], State) ->
     io:format("start new node ~p of ~s ~n", [NodeName, Vsn]),
     case downgrade_add(NodeName, Vsn, State) of
         {ok, State1} ->
